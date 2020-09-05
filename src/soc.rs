@@ -37,6 +37,8 @@ impl Soc {
 
     pub fn num_syncpoints(self) -> u32 {
         match self.0 {
+            0x20 | 0x30 | 0x35 => 32,
+            0x40 | 0x13 => 192,
             0x18 => 576,
             0x19 => 704,
             _    => unimplemented!()
@@ -51,6 +53,12 @@ impl Soc {
 impl std::fmt::Display for Soc {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let s = match self.0 {
+            0x20 => "Tegra20",
+            0x30 => "Tegra30",
+            0x35 => "Tegra114",
+            0x40 => "Tegra124",
+            0x13 => "Tegra132",
+            0x21 => "Tegra210",
             0x18 => "Tegra186",
             0x19 => "Tegra194",
             _ => unimplemented!()
