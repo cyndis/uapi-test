@@ -206,8 +206,7 @@ struct SubmitTestCtx<'a> {
 
 impl SubmitTestCtx<'_> {
     fn setup_submit(&mut self) {
-        self.args.num_syncpt_incrs = self.incr.len() as u32;
-        self.args.syncpt_incrs_ptr = self.incr.as_ptr() as u64;
+        self.args.syncpt_incrs[0..self.incr.len()].copy_from_slice(&self.incr);
 
         self.args.num_cmds = self.cmd.len() as u32;
         self.args.cmds_ptr = self.cmd.as_ptr() as u64;
@@ -225,7 +224,7 @@ impl SubmitTestCtx<'_> {
     }
 
     fn submit_raw(&mut self, main: &Main) -> IocResult<()> {
-        main.drm.channel_submit_raw(self.args)?;
+        self.args = main.drm.channel_submit_raw(self.args)?;
 
         Ok(())
     }
@@ -251,7 +250,6 @@ impl SubmitTestCtx<'_> {
     fn push_buf(&mut self, mapping: &Mapping) {
         let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
         buf.mapping_id = mapping.id();
-        buf.flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_WRITE_RELOC;
         buf.reloc.gather_offset_words = self.gather_data.len() as _;
         buf.reloc.target_offset = 0;
         buf.reloc.shift = 8;
@@ -290,7 +288,6 @@ fn submit_test<T>(main: &Main, f: impl FnOnce(SubmitTestCtx) -> EResult<T>) -> E
     let gather_data = Vec::new();
 
     args.channel_ctx = channel.context();
-    args.timeout_us = 10000 * 1000;
 
     (f)(SubmitTestCtx { channel, syncpt, syncpt_id, args, incr, cmd, buf, gather_data })
 }
@@ -308,19 +305,16 @@ pub fn test_channel_submit_invalid_ioctl(main: &Main) -> EResult<()> {
     /* Submit otherwise good jobs, but perturb them slightly to make them invalid. */
 
     check_eq!(submit(main, |_c| ())?, None);
-    check_eq!(submit(main, |c| c.args.reserved[0] = 1)?, Some(EINVAL));
-    check_eq!(submit(main, |c| c.args.reserved[1] = 1)?, Some(EINVAL));
-    check_eq!(submit(main, |c| c.args.reserved[2] = 1)?, Some(EINVAL));
-    check_eq!(submit(main, |c| c.args.reserved[3] = 1)?, Some(EINVAL));
+    check_eq!(submit(main, |c| c.args.reserved0 = 1)?, Some(EINVAL));
+    check_eq!(submit(main, |c| c.args.reserved1 = 1)?, Some(EINVAL));
     check_eq!(submit(main, |c| { c.args.gather_data_ptr = 0; c.args.gather_data_words = 1 })?, Some(EFAULT));
     check_eq!(submit(main, |c| { c.args.bufs_ptr = 0; c.args.num_bufs = 1 })?, Some(EFAULT));
     check_eq!(submit(main, |c| { c.args.cmds_ptr = 0; c.args.num_cmds = 1 })?, Some(EFAULT));
-    check_eq!(submit(main, |c| { c.args.syncpt_incrs_ptr = 0; c.args.num_syncpt_incrs = 1; })?, Some(EFAULT));
 
     check_eq!(submit(main, |c| c.cmd[0].__bindgen_anon_1.gather_uptr.words = 1000)?, Some(EINVAL));
 
-    check_eq!(submit(main, |c| c.incr[0].flags = 0xffffffff)?, Some(EINVAL));
-    check_eq!(submit(main, |c| c.incr[0].syncpt_fd = 0)?, Some(EINVAL));
+    check_eq!(submit(main, |c| c.args.syncpt_incrs[0].flags = 0xffffffff)?, Some(EINVAL));
+    check_eq!(submit(main, |c| c.args.syncpt_incrs[0].syncpt_fd = 0)?, Some(EINVAL));
 
     Ok(())
 }
@@ -344,9 +338,9 @@ pub fn test_channel_submit_increment_syncpoint_twice(main: &Main) -> EResult<()>
 
         ctx.submit(main)?;
 
-        check_eq!(ctx.incr[0].fence_value, base_value.wrapping_add(2));
+        check_eq!(ctx.args.syncpt_incrs[0].fence_value, base_value.wrapping_add(2));
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(1000).is_ok());
 
         Ok(())
@@ -398,7 +392,7 @@ pub fn test_channel_submit_vic_clear(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(1000).is_ok());
 
         Ok(())
@@ -429,14 +423,14 @@ pub fn test_channel_submit_timeout(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let a = ctx.incr[0].fence_value;
+        let a = ctx.args.syncpt_incrs[0].fence_value;
 
         /* Then, submit OK job */
 
         ctx.incr[0].num_incrs = 1;
         ctx.submit(main)?;
 
-        let b = ctx.incr[0].fence_value;
+        let b = ctx.args.syncpt_incrs[0].fence_value;
 
         let fence_a = main.host1x.create_fence(ctx.syncpt_id, a)?;
         let fence_b = main.host1x.create_fence(ctx.syncpt_id, b)?;
@@ -467,7 +461,7 @@ pub fn test_channel_submit_timeout(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(1000).is_ok());
 
         Ok(())
@@ -506,15 +500,15 @@ pub fn test_channel_submit_wait(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value-1)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value-1)?;
         check!(fence.wait(1000).is_ok());
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(100).is_err());
 
         syncpt.increment(1)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(1000).is_ok());
 
         Ok(())
@@ -581,7 +575,6 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
 
         let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
         buf.mapping_id = cfg_m.id();
-        buf.flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_WRITE_RELOC;
         buf.reloc.gather_offset_words = (ctx.gather_data.len()-1) as _;
         buf.reloc.target_offset = 0;
         buf.reloc.shift = 8;
@@ -591,7 +584,6 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
 
         let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
         buf.mapping_id = surf_m.id();
-        buf.flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_WRITE_RELOC;
         buf.reloc.gather_offset_words = (ctx.gather_data.len()-1) as _;
         buf.reloc.target_offset = 0;
         buf.reloc.shift = 8;
@@ -601,7 +593,6 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
 
         let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
         buf.mapping_id = filt_m.id();
-        buf.flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_WRITE_RELOC;
         buf.reloc.gather_offset_words = (ctx.gather_data.len()-1) as _;
         buf.reloc.target_offset = 0;
         buf.reloc.shift = 8;
@@ -617,7 +608,7 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value-1)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value-1)?;
         check!(fence.wait(1000).is_ok());
 
         drop(cfg_m);
@@ -628,7 +619,7 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
 
         syncpt.increment(1)?;
 
-        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.incr[0].fence_value)?;
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
         check!(fence.wait(1000).is_ok());
 
         Ok(())
@@ -658,7 +649,7 @@ pub fn test_channel_submit_post_sync_file(main: &Main) -> EResult<()> {
 
         ctx.submit(main)?;
 
-        let fence = Fence::from_fd(ctx.incr[0].sync_file_fd);
+        let fence = Fence::from_fd(ctx.args.syncpt_incrs[0].sync_file_fd);
         check!(fence.wait(1000).is_ok());
 
         Ok(())
