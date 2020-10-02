@@ -785,25 +785,23 @@ struct drm_tegra_channel_unmap {
 
 /* Submission */
 
-/** Patch address of the specified mapping in the submitted gather. */
-#define DRM_TEGRA_SUBMIT_BUF_WRITE_RELOC		(1<<0)
 /**
  * Specify that bit 39 of the patched-in address should be set to
  * trigger layout swizzling between Tegra and non-Tegra Blocklinear
  * layout on systems that store surfaces in system memory in non-Tegra
  * Blocklinear layout.
  */
-#define DRM_TEGRA_SUBMIT_BUF_RELOC_BLOCKLINEAR		(1<<1)
+#define DRM_TEGRA_SUBMIT_BUF_RELOC_BLOCKLINEAR		(1<<0)
 /**
  * Specify that any implicit fences required to read this buffer
  * should be waited before executing the job.
  */
-#define DRM_TEGRA_SUBMIT_BUF_RESV_READ			(1<<2)
+#define DRM_TEGRA_SUBMIT_BUF_RESV_READ			(1<<1)
 /**
  * Specify that any implicit fences required to write this buffer
  * should be waited before executing the job.
  */
-#define DRM_TEGRA_SUBMIT_BUF_RESV_WRITE			(1<<3)
+#define DRM_TEGRA_SUBMIT_BUF_RESV_WRITE			(1<<2)
 
 struct drm_tegra_submit_buf {
 	/**
@@ -820,6 +818,12 @@ struct drm_tegra_submit_buf {
 	 */
 	__u32 flags;
 
+	/**
+	 * Information for relocation patching. Relocation patching will
+	 * be done if the MAP IOCTL that created `mapping_id` did not
+	 * return an IOVA. If an IOVA was returned, the application is
+	 * responsible for patching the address into the gather.
+	 */
 	struct {
 		/**
 		 * @target_offset: [in]
@@ -972,22 +976,7 @@ struct drm_tegra_channel_submit {
 	 */
 	__u32 channel_ctx;
 
-	/**
-	 * @timeout_us: [in]
-	 *
-	 * Timeout in microseconds after which the kernel may consider
-	 * the job hung and may clean up the job and any dependent jobs.
-	 *
-	 * This value may be capped by the kernel.
-	 */
-	__u32 timeout_us;
-
-	/**
-	 * @syncpt_incrs_ptr: [in]
-	 *
-	 * Pointer to an array of drm_tegra_submit_syncpt_incr structures.
-	 */
-	__u64 syncpt_incrs_ptr;
+	__u32 reserved0;
 
 	/**
 	 * @bufs_ptr: [in]
@@ -1012,13 +1001,6 @@ struct drm_tegra_channel_submit {
 	__u64 gather_data_ptr;
 
 	/**
-	 * @num_syncpt_incrs: [in]
-	 *
-	 * Number of elements in the `syncpt_incrs_ptr` array.
-	 */
-	__u32 num_syncpt_incrs;
-
-	/**
 	 * @num_bufs: [in]
 	 *
 	 * Number of elements in the `bufs_ptr` array.
@@ -1039,7 +1021,14 @@ struct drm_tegra_channel_submit {
 	 */
 	__u32 gather_data_words;
 
-	__u32 reserved[4];
+	__u32 reserved1;
+
+	/**
+	 * @syncpt_incrs: [in,out]
+	 *
+	 * Information about each distinct syncpoint the job will increment.
+	 */
+	struct drm_tegra_submit_syncpt_incr syncpt_incrs[2];
 };
 
 #define DRM_IOCTL_TEGRA_CHANNEL_OPEN     DRM_IOWR(DRM_COMMAND_BASE + 0x10, struct drm_tegra_channel_open)
