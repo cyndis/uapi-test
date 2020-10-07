@@ -490,7 +490,7 @@ pub fn test_channel_submit_wait(main: &Main) -> EResult<()> {
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
         cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
-        cmd.__bindgen_anon_1.wait_syncpt.threshold = value+1;
+        cmd.__bindgen_anon_1.wait_syncpt.threshold = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
@@ -567,7 +567,7 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
         cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
-        cmd.__bindgen_anon_1.wait_syncpt.threshold = value+1;
+        cmd.__bindgen_anon_1.wait_syncpt.threshold = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
         ctx.gather_data.extend_from_slice(&[0x1_010_0002, 0x704>>2, (2960 / 16) << 16]);
