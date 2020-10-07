@@ -373,12 +373,12 @@ pub fn test_channel_submit_vic_clear(main: &Main) -> EResult<()> {
     }
 
     let surf_gem = check_unwrap!(main.drm.gem_create(32768));
-    let filt_gem = check_unwrap!(main.drm.gem_create(0x1000));
+    let filt_gem = check_unwrap!(main.drm.gem_create(0x3000));
 
     submit_test(main, |mut ctx| {
         let cfg_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &cfg_gem, 0x0, 0x1000, false));
-        let surf_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &surf_gem, 0x0, 0x1000, true));
-        let filt_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &filt_gem, 0x0, 0x1000, false));
+        let surf_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &surf_gem, 0x0, 32768, true));
+        let filt_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &filt_gem, 0x0, 0x3000, false));
 
         ctx.push(&[0x1_010_0002, 0x704>>2, (2960 / 16) << 16]);
         ctx.push(&[0x1_010_0002, 0x708>>2]);
@@ -545,12 +545,12 @@ pub fn test_channel_buf_refcounting(main: &Main) -> EResult<()> {
     }
 
     let surf_gem = check_unwrap!(main.drm.gem_create(32768));
-    let filt_gem = check_unwrap!(main.drm.gem_create(0x1000));
+    let filt_gem = check_unwrap!(main.drm.gem_create(0x3000));
 
     submit_test(main, |mut ctx| {
         let cfg_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &cfg_gem, 0x0, 0x1000, false));
-        let surf_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &surf_gem, 0x0, 0x1000, true));
-        let filt_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &filt_gem, 0x0, 0x1000, false));
+        let surf_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &surf_gem, 0x0, 32768, true));
+        let filt_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &filt_gem, 0x0, 0x3000, false));
 
         let mut incr: tegra_drm::drm_tegra_submit_syncpt_incr = unsafe { std::mem::zeroed() };
         incr.syncpt_fd = ctx.syncpt.fd();
