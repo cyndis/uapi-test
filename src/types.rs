@@ -387,6 +387,17 @@ impl Drm {
         }
     }
 
+    pub fn prime_handle_to_fd(&self, mut args: drm_prime_handle) -> IocResult<drm_prime_handle> {
+        unsafe {
+            let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_PRIME_HANDLE_TO_FD, &mut args);
+            if err != 0 {
+                Err(Errno::get())?;
+            }
+
+            Ok(args)
+        }
+    }
+
     pub fn channel_submit_raw(&self, mut args: drm_tegra_channel_submit) -> IocResult<drm_tegra_channel_submit> {
         unsafe {
             let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_TEGRA_CHANNEL_SUBMIT, &mut args);
@@ -457,6 +468,19 @@ impl Gem<'_> {
             Ok(mmap)
         }
     }
+
+    pub fn export(&self) -> EResult<i32> {
+        unsafe {
+            let mut args: drm_prime_handle = std::mem::zeroed();
+
+            args.handle = self.handle;
+            args.flags = 2;
+
+            let args = check_unwrap!(self.drm.prime_handle_to_fd(args));
+
+            Ok(args.fd)
+        }
+    }
 }
 
 impl Drop for Gem<'_> {
@@ -518,5 +542,60 @@ impl Drop for Mapping<'_> {
 impl std::fmt::Debug for Mapping<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Mapping(ctx={}, id={})", self.context, self.id)
+    }
+}
+
+pub struct VGem {
+    fd: std::fs::File,
+}
+
+impl VGem {
+    pub fn open() -> EResult<VGem> {
+        let fd = std::fs::OpenOptions::new().read(true).write(true).open("/dev/dri/card1")?;
+
+        Ok(VGem { fd })
+    }
+
+    pub fn fence_attach(&self, handle: u32, write: bool) -> IocResult<u32> {
+        unsafe {
+            let mut args: drm_vgem_fence_attach = std::mem::zeroed();
+            args.handle = handle;
+            args.flags = if write { 1 } else { 0 };
+
+            let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_VGEM_FENCE_ATTACH, &mut args);
+            if err != 0 {
+                Err(Errno::get())?;
+            }
+
+            Ok(args.out_fence)
+        }
+    }
+
+    pub fn fence_signal(&self, fence: u32) -> IocResult<()> {
+        unsafe {
+            let mut args: drm_vgem_fence_signal = std::mem::zeroed();
+            args.fence = fence;
+
+            let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_VGEM_FENCE_SIGNAL, &mut args);
+            if err != 0 {
+                Err(Errno::get())?;
+            }
+
+            Ok(())
+        }
+    }
+
+    pub fn import(&self, fd: i32) -> IocResult<u32> {
+        unsafe {
+            let mut args: drm_prime_handle = std::mem::zeroed();
+            args.fd = fd;
+
+            let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_PRIME_FD_TO_HANDLE, &mut args);
+            if err != 0 {
+                Err(Errno::get())?;
+            }
+
+            Ok(args.handle)
+        }
     }
 }

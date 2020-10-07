@@ -48,12 +48,44 @@ struct drm_syncobj_wait {
         __u32 pad;
 };
 
+struct drm_prime_handle {
+        __u32 handle;
+        __u32 flags;
+        __s32 fd;
+};
+
 #define DRM_IOCTL_GEM_CLOSE             DRM_IOW (0x09, struct drm_gem_close)
+#define DRM_IOCTL_PRIME_HANDLE_TO_FD    DRM_IOWR(0x2d, struct drm_prime_handle)
+#define DRM_IOCTL_PRIME_FD_TO_HANDLE    DRM_IOWR(0x2e, struct drm_prime_handle)
 #define DRM_IOCTL_SYNCOBJ_CREATE        DRM_IOWR(0xBF, struct drm_syncobj_create)
 #define DRM_IOCTL_SYNCOBJ_DESTROY       DRM_IOWR(0xC0, struct drm_syncobj_destroy)
 #define DRM_IOCTL_SYNCOBJ_WAIT          DRM_IOWR(0xC3, struct drm_syncobj_wait)
 
 MAKE_CONST(DRM_IOCTL_GEM_CLOSE)
+MAKE_CONST(DRM_IOCTL_PRIME_HANDLE_TO_FD)
+MAKE_CONST(DRM_IOCTL_PRIME_FD_TO_HANDLE)
 MAKE_CONST(DRM_IOCTL_SYNCOBJ_CREATE)
 MAKE_CONST(DRM_IOCTL_SYNCOBJ_DESTROY)
 MAKE_CONST(DRM_IOCTL_SYNCOBJ_WAIT)
+
+#define DRM_VGEM_FENCE_ATTACH   0x1
+#define DRM_VGEM_FENCE_SIGNAL   0x2
+
+#define DRM_IOCTL_VGEM_FENCE_ATTACH     DRM_IOWR( DRM_COMMAND_BASE + DRM_VGEM_FENCE_ATTACH, struct drm_vgem_fence_attach)
+#define DRM_IOCTL_VGEM_FENCE_SIGNAL     DRM_IOW( DRM_COMMAND_BASE + DRM_VGEM_FENCE_SIGNAL, struct drm_vgem_fence_signal)
+
+struct drm_vgem_fence_attach {
+        __u32 handle;
+        __u32 flags;
+#define VGEM_FENCE_WRITE        0x1
+        __u32 out_fence;
+        __u32 pad;
+};
+
+struct drm_vgem_fence_signal {
+        __u32 fence;
+        __u32 flags;
+};
+
+MAKE_CONST(DRM_IOCTL_VGEM_FENCE_ATTACH)
+MAKE_CONST(DRM_IOCTL_VGEM_FENCE_SIGNAL)

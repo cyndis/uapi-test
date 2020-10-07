@@ -23,7 +23,7 @@
  */
 
 use crate::{tegra_drm, vic, Main, EResult, IocResult, Errno, EINVAL, ENODEV, ENOSPC, EFAULT, EPERM};
-use crate::types::{Channel, Syncpoint, Fence, Mapping};
+use crate::types::{Channel, Syncpoint, Fence, Mapping, VGem};
 
 pub fn test_open_channel_invalid_ioctl(main: &Main) -> EResult<()> {
     let zero: tegra_drm::drm_tegra_channel_open = unsafe { std::mem::zeroed() };
@@ -654,4 +654,170 @@ pub fn test_channel_submit_post_sync_file(main: &Main) -> EResult<()> {
 
         Ok(())
     })
+}
+
+pub fn test_channel_submit_post_resv(main: &Main) -> EResult<()> {
+    let syncpt = main.host1x.allocate_syncpoint()?;
+    let syncpt_id = syncpt.id()?;
+    let value = main.host1x.read_syncpoint(syncpt_id)?;
+
+    let gem_read = check_unwrap!(main.drm.gem_create(0x1000));
+    let gem_write = check_unwrap!(main.drm.gem_create(0x1000));
+
+    let fd_read = gem_read.export()?;
+    let fd_write = gem_write.export()?;
+
+    let mut pfd_read = libc::pollfd {
+        fd: fd_read,
+        events: 0,
+        revents: 0,
+    };
+    let mut pfd_write = libc::pollfd {
+        fd: fd_write,
+        events: 0,
+        revents: 0,
+    };
+
+    submit_test(main, |mut ctx| {
+        let read_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &gem_read, 0x0, 0x1000, false));
+        let write_m = check_unwrap!(main.drm.channel_map(&ctx.channel, &gem_write, 0x0, 0x1000, false));
+
+        ctx.push(&[0x1_00c_0001]);
+        ctx.push_buf(&read_m);
+        ctx.buf[0].flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_READ;
+
+        ctx.push(&[0x1_00c_0001]);
+        ctx.push_buf(&write_m);
+        ctx.buf[1].flags = tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_WRITE;
+
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
+        cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
+        cmd.__bindgen_anon_1.wait_syncpt.threshold = value.wrapping_add(1);
+        ctx.cmd.push(cmd);
+
+        ctx.push_syncpt_incr(0);
+
+        ctx.submit(main)?;
+
+        unsafe {
+            pfd_read.events = libc::POLLIN;
+            check_eq!(libc::poll(&mut pfd_read, 1, 100), 1);
+            pfd_read.events = libc::POLLOUT;
+            check_eq!(libc::poll(&mut pfd_read, 1, 100), 0);
+            pfd_write.events = libc::POLLIN;
+            check_eq!(libc::poll(&mut pfd_write, 1, 100), 0);
+            pfd_write.events = libc::POLLOUT;
+            check_eq!(libc::poll(&mut pfd_write, 1, 100), 0);
+        }
+
+        syncpt.increment(1)?;
+
+        unsafe {
+            pfd_read.events = libc::POLLIN;
+            check_eq!(libc::poll(&mut pfd_read, 1, 100), 1);
+            pfd_read.events = libc::POLLOUT;
+            check_eq!(libc::poll(&mut pfd_read, 1, 100), 1);
+            pfd_write.events = libc::POLLIN;
+            check_eq!(libc::poll(&mut pfd_write, 1, 100), 1);
+            pfd_write.events = libc::POLLOUT;
+            check_eq!(libc::poll(&mut pfd_write, 1, 100), 1);
+        }
+
+        let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
+        check!(fence.wait(1000).is_ok());
+
+        Ok(())
+    })?;
+
+    Ok(())
+}
+
+pub fn test_channel_submit_wait_resv(main: &Main) -> EResult<()> {
+    let gem_read = check_unwrap!(main.drm.gem_create(0x1000));
+    let gem_write = check_unwrap!(main.drm.gem_create(0x1000));
+    let gem_write2 = check_unwrap!(main.drm.gem_create(0x1000));
+
+    let fd_read = gem_read.export()?;
+    let fd_write = gem_write.export()?;
+    let fd_write2 = gem_write2.export()?;
+
+    let vgem = std::sync::Arc::new(VGem::open()?);
+    let vgem_read = vgem.import(fd_read)?;
+    let vgem_write = vgem.import(fd_write)?;
+    let vgem_write2 = vgem.import(fd_write2)?;
+
+    let f_read = vgem.fence_attach(vgem_read, false)?;
+    let f_write = vgem.fence_attach(vgem_write, true)?;
+    let f_write2 = vgem.fence_attach(vgem_write2, true)?;
+
+    let combinations = &[
+        /* Job reads/writes GEM                    , GEM        , Blocking fence */
+        (tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_READ , &gem_read  , None),
+        (tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_WRITE, &gem_read  , Some(f_read)),
+        (tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_READ , &gem_write , Some(f_write)),
+        (tegra_drm::DRM_TEGRA_SUBMIT_BUF_RESV_WRITE, &gem_write2, Some(f_write2)),
+    ];
+
+    for (i, combo) in combinations.into_iter().enumerate() {
+        let vgem = vgem.clone();
+        submit_test(main, |mut ctx| {
+            use std::sync::atomic::Ordering::SeqCst;
+
+            let m = check_unwrap!(main.drm.channel_map(&ctx.channel, combo.1, 0x0, 0x1000, false));
+
+            ctx.push(&[0x1_010_0002, 0x70c>>2]);
+            ctx.push_buf(&m);
+            ctx.buf[0].flags = combo.0;
+
+            ctx.push_syncpt_incr(0);
+
+            let signaled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+            let fence = combo.2;
+            let monitor = std::thread::spawn({
+                let signaled = signaled.clone();
+                move || {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+
+                    match (fence, signaled.load(SeqCst)) {
+                        (None, true) => {
+                            true
+                        }
+                        (None, false) => {
+                            eprintln!("[error: {}, was not signaled]", i);
+                            false
+                        }
+                        (Some(_), true) => {
+                            eprintln!("[error: {}, signaled too early]", i);
+                            false
+                        }
+                        (Some(f), false) => {
+                            vgem.fence_signal(f).unwrap();
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                            if signaled.load(SeqCst) {
+                                true
+                            } else {
+                                eprintln!("[error: {}, was not signaled]", i);
+                                false
+                            }
+                        }
+                    }
+                }
+            });
+
+            ctx.submit(main)?;
+            let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incrs[0].fence_value)?;
+            check!(fence.wait(1000).is_ok());
+
+            signaled.store(true, SeqCst);
+
+            let result = monitor.join().unwrap();
+            check!(result);
+
+            Ok(())
+        })?;
+    }
+
+    Ok(())
 }
