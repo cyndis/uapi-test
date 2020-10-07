@@ -434,7 +434,7 @@ pub fn test_channel_submit_timeout(main: &Main) -> EResult<()> {
 
         let fence_a = main.host1x.create_fence(ctx.syncpt_id, a)?;
         let fence_b = main.host1x.create_fence(ctx.syncpt_id, b)?;
-        check!(fence_a.wait(15000).is_err());
+        check!(fence_a.wait(20000).is_err());
         check!(fence_b.wait(1000).is_err());
 
         /* Further submission should be rejected */
