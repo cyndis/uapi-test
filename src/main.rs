@@ -217,14 +217,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if soc.chip_id() == 0x18 {
         tests.push(test!(test_channel_buf_refcounting));
-        tests.push(test!(test_channel_submit_post_resv));
-        tests.push(test!(test_channel_submit_wait_resv));
         tests.push(test!(test_channel_submit_vic_clear));
     }
 
     tests.push(test!(test_channel_submit_timeout));
-
-    tests.push(test!(test_channel_submit_post_sync_file));
 
     if args.list {
         for (name, _) in tests {

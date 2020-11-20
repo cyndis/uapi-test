@@ -689,8 +689,6 @@ struct drm_tegra_channel_open {
 	 * to determine how the engine needs to be programmed.
 	 */
 	__u32 hardware_version;
-
-	__u32 reserved[2];
 };
 
 struct drm_tegra_channel_close {
@@ -700,8 +698,6 @@ struct drm_tegra_channel_close {
 	 * Identifier of the channel to close.
 	 */
 	__u32 channel_ctx;
-
-	__u32 reserved[1];
 };
 
 #define DRM_TEGRA_CHANNEL_MAP_READWRITE			(1<<0)
@@ -722,30 +718,11 @@ struct drm_tegra_channel_map {
 	__u32 handle;
 
 	/**
-	 * @offset: [in]
+	 * @flags: [in]
 	 *
-	 * Offset in the GEM handle's underlying memory to start the
-	 * mapping from.
+	 * Flags.
 	 */
-	__u64 offset;
-
-	/**
-	 * @length: [in]
-	 *
-	 * Length of memory to map.
-	 */
-	__u64 length;
-
-	/**
-	 * @iova: [out]
-	 *
-	 * IOVA of mapped memory. Only available if hardware memory
-	 * isolation is supported. If provided, userspace can program this
-	 * address directly to the engine to skip using relocations.
-	 *
-	 * Will be set to U64_MAX if unavailable.
-	 */
-	__u64 iova;
+	__u32 flags;
 
 	/**
 	 * @mapping_id: [out]
@@ -754,15 +731,6 @@ struct drm_tegra_channel_map {
 	 * relocations or unmapping later.
 	 */
 	__u32 mapping_id;
-
-	/**
-	 * @flags: [in]
-	 *
-	 * Flags.
-	 */
-	__u32 flags;
-
-	__u32 reserved[2];
 };
 
 struct drm_tegra_channel_unmap {
@@ -779,8 +747,6 @@ struct drm_tegra_channel_unmap {
 	 * Mapping identifier of the memory mapping to unmap.
 	 */
 	__u32 mapping_id;
-
-	__u32 reserved[2];
 };
 
 /* Submission */
@@ -792,16 +758,6 @@ struct drm_tegra_channel_unmap {
  * Blocklinear layout.
  */
 #define DRM_TEGRA_SUBMIT_BUF_RELOC_BLOCKLINEAR		(1<<0)
-/**
- * Specify that any implicit fences required to read this buffer
- * should be waited before executing the job.
- */
-#define DRM_TEGRA_SUBMIT_BUF_RESV_READ			(1<<1)
-/**
- * Specify that any implicit fences required to write this buffer
- * should be waited before executing the job.
- */
-#define DRM_TEGRA_SUBMIT_BUF_RESV_WRITE			(1<<2)
 
 struct drm_tegra_submit_buf {
 	/**
@@ -849,11 +805,7 @@ struct drm_tegra_submit_buf {
 		 */
 		__u32 shift;
 	} reloc;
-
-	__u32 reserved[2];
 };
-
-#define DRM_TEGRA_SUBMIT_SYNCPT_INCR_CREATE_SYNC_FILE  (1<<0)
 
 struct drm_tegra_submit_syncpt_incr {
 	/**
@@ -891,17 +843,6 @@ struct drm_tegra_submit_syncpt_incr {
 	 * get executed.
 	 */
 	__u32 fence_value;
-
-	/**
-	 * @sync_file_fd: [out]
-	 *
-	 * Created sync_file file descriptor corresponding to the threshold
-	 * specified by `fence_value`. Only set if the CREATE_SYNC_FILE
-	 * flag is specified.
-	 */
-	__s32 sync_file_fd;
-
-	__u32 reserved[3];
 };
 
 /**
@@ -914,19 +855,6 @@ struct drm_tegra_submit_syncpt_incr {
  * commands.
  */
 #define DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT		1
-/**
- * Wait for the fence represented by the sync_file file descriptor to be
- * signaled before continuing with further commands. This command may be
- * executed before submission of the job to hardware.
- */
-#define DRM_TEGRA_SUBMIT_CMD_WAIT_SYNC_FILE		2
-
-/**
- * If set, the driver is allowed to skip execution of this command if
- * the previous job executed by the engine was from the same channel
- * context as this job.
- */
-#define DRM_TEGRA_SUBMIT_CONTEXT_SETUP			(1<<0)
 
 struct drm_tegra_submit_cmd_gather_uptr {
 	__u32 words;
@@ -937,11 +865,6 @@ struct drm_tegra_submit_cmd_wait_syncpt {
 	__u32 id;
 	__u32 threshold;
 	__u32 reserved[2];
-};
-
-struct drm_tegra_submit_cmd_wait_sync_file {
-	__s32 fd;
-	__u32 reserved[3];
 };
 
 struct drm_tegra_submit_cmd {
@@ -963,7 +886,6 @@ struct drm_tegra_submit_cmd {
 	union {
 		struct drm_tegra_submit_cmd_gather_uptr gather_uptr;
 		struct drm_tegra_submit_cmd_wait_syncpt wait_syncpt;
-		struct drm_tegra_submit_cmd_wait_sync_file wait_sync_file;
 		__u32 reserved[4];
 	};
 };
@@ -976,7 +898,26 @@ struct drm_tegra_channel_submit {
 	 */
 	__u32 channel_ctx;
 
-	__u32 reserved0;
+	/**
+	 * @num_bufs: [in]
+	 *
+	 * Number of elements in the `bufs_ptr` array.
+	 */
+	__u32 num_bufs;
+
+	/**
+	 * @num_cmds: [in]
+	 *
+	 * Number of elements in the `cmds_ptr` array.
+	 */
+	__u32 num_cmds;
+
+	/**
+	 * @gather_data_words: [in]
+	 *
+	 * Number of 32-bit words in the `gather_data_ptr` array.
+	 */
+	__u32 gather_data_words;
 
 	/**
 	 * @bufs_ptr: [in]
@@ -1001,34 +942,11 @@ struct drm_tegra_channel_submit {
 	__u64 gather_data_ptr;
 
 	/**
-	 * @num_bufs: [in]
+	 * @syncpt_incr: [in,out]
 	 *
-	 * Number of elements in the `bufs_ptr` array.
+	 * Information about the syncpoint the job will increment.
 	 */
-	__u32 num_bufs;
-
-	/**
-	 * @num_cmds: [in]
-	 *
-	 * Number of elements in the `cmds_ptr` array.
-	 */
-	__u32 num_cmds;
-
-	/**
-	 * @gather_data_words: [in]
-	 *
-	 * Number of 32-bit words in the `gather_data_ptr` array.
-	 */
-	__u32 gather_data_words;
-
-	__u32 reserved1;
-
-	/**
-	 * @syncpt_incrs: [in,out]
-	 *
-	 * Information about each distinct syncpoint the job will increment.
-	 */
-	struct drm_tegra_submit_syncpt_incr syncpt_incrs[2];
+	struct drm_tegra_submit_syncpt_incr syncpt_incr;
 };
 
 #define DRM_IOCTL_TEGRA_CHANNEL_OPEN     DRM_IOWR(DRM_COMMAND_BASE + 0x10, struct drm_tegra_channel_open)

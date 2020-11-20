@@ -306,13 +306,13 @@ impl Drm {
     }
 
     pub fn channel_map(&self, channel: &Channel, gem: &Gem, offset: u64, length: u64, rw: bool) -> IocResult<Mapping> {
+        assert_eq!(offset, 0);
+
         unsafe {
             let mut args: drm_tegra_channel_map = std::mem::zeroed();
 
             args.channel_ctx = channel.context();
             args.handle = gem.handle();
-            args.offset = offset;
-            args.length = length;
             if rw {
                 args.flags = DRM_TEGRA_CHANNEL_MAP_READWRITE;
             }
@@ -323,7 +323,7 @@ impl Drm {
                 drm: self,
                 id: args.mapping_id,
                 context: channel.context(),
-                iova: args.iova,
+                iova: 0,
             })
         }
     }
