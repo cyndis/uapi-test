@@ -31,7 +31,7 @@ impl Soc {
         let soc = std::fs::read_to_string("/sys/devices/soc0/soc_id")?
             .trim_end()
             .parse::<u32>()?;
-    
+
         Ok(Soc(soc))
     }
 
@@ -42,6 +42,14 @@ impl Soc {
             0x18 => 576,
             0x19 => 704,
             _    => unimplemented!()
+        }
+    }
+
+    pub fn condition_shift(self) -> u32 {
+        if self.num_syncpoints() > 0xff {
+            10
+        } else {
+            8
         }
     }
 

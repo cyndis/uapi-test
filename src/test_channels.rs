@@ -189,6 +189,7 @@ pub fn test_channel_map_gem_close(main: &Main) -> EResult<()> {
 }
 
 struct SubmitTestCtx<'a> {
+    main: &'a Main,
     channel: Channel<'a>,
     syncpt: Syncpoint,
     syncpt_id: u32,
@@ -258,7 +259,8 @@ impl SubmitTestCtx<'_> {
 
     fn push_syncpt_incr(&mut self, condition: u32) {
         /* TODO this needs to check chip */
-        self.push(&[0x1_000_0001, self.syncpt_id|(condition<<10)]);
+        self.push(&[0x1_000_0001,
+            self.syncpt_id|(condition << self.main.soc.condition_shift())]);
 
         for incr in &mut self.incr {
             if incr.syncpt_fd == self.syncpt.fd() {
@@ -287,7 +289,7 @@ fn submit_test<T>(main: &Main, f: impl FnOnce(SubmitTestCtx) -> EResult<T>) -> E
 
     args.channel_ctx = channel.context();
 
-    (f)(SubmitTestCtx { channel, syncpt, syncpt_id, args, incr, cmd, buf, gather_data })
+    (f)(SubmitTestCtx { main, channel, syncpt, syncpt_id, args, incr, cmd, buf, gather_data })
 }
 
 pub fn test_channel_submit_invalid_ioctl(main: &Main) -> EResult<()> {
