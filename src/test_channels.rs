@@ -336,7 +336,11 @@ pub fn test_channel_submit_increment_syncpoint_twice(main: &Main) -> EResult<()>
 
         ctx.submit(main)?;
 
-        check_eq!(ctx.args.syncpt_incr.fence_value, base_value.wrapping_add(2));
+        /*
+         * The kernel is allowed to insert extra increments at the beginning of the job,
+         * so allow for more than 2 increments.
+         */
+        check!(ctx.args.syncpt_incr.fence_value.wrapping_sub(base_value) >= 2);
 
         let fence = main.host1x.create_fence(ctx.syncpt_id, ctx.args.syncpt_incr.fence_value)?;
         check!(fence.wait(1000).is_ok());
