@@ -22,34 +22,54 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::{env, path::PathBuf};
+use crate::IocResult;
+use crate::tegra_drm::*;
+use super::Drm;
 
-#[derive(Debug)]
-pub struct MakeMacroConstDefs;
-impl bindgen::callbacks::ParseCallbacks for MakeMacroConstDefs {
-    fn item_name(&self, original: &str) -> Option<String> {
-        Some(original.trim_start_matches("MK_").to_owned())
+pub struct Mapping<'a> {
+    pub(super) drm: &'a Drm,
+    pub(super) id: u32,
+    pub(super) context: u32,
+    #[allow(unused)]
+    pub(super) iova: u64,
+}
+
+impl Mapping<'_> {
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    #[allow(unused)]
+    pub fn iova(&self) -> u64 {
+        self.iova
+    }
+
+    pub fn drop(mut self) -> IocResult<()> {
+        let r = self.drm.channel_unmap_raw(drm_tegra_channel_unmap {
+            context: self.context,
+            mapping: self.id,
+            ..unsafe { std::mem::zeroed() }
+        });
+        self.id = 0;
+        r.map(|_| ())
     }
 }
 
-fn generate_bindings(wrapper: &str, out: &str) {
-    println!("cargo:rerun-if-changed={}", wrapper);
-
-    let bindings = bindgen::Builder::default()
-        .header(wrapper)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .parse_callbacks(Box::new(MakeMacroConstDefs))
-        .generate()
-        .expect("Failed to generate IOCTL bindings");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    bindings
-        .write_to_file(out_path.join(out))
-        .expect("Failed to write IOCTL bindings");
+impl Drop for Mapping<'_> {
+    fn drop(&mut self) {
+        if self.id == 0 {
+            return;
+        }
+        let _ = self.drm.channel_unmap_raw(drm_tegra_channel_unmap {
+            context: self.context,
+            mapping: self.id,
+            ..unsafe { std::mem::zeroed() }
+        });
+    }
 }
 
-fn main() {
-    generate_bindings("tegra_drm_wrapper.h", "tegra_drm_bindings.rs");
-    generate_bindings("vic.h", "vic_bindings.rs");
+impl std::fmt::Debug for Mapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Mapping(ctx={}, id={})", self.context, self.id)
+    }
 }

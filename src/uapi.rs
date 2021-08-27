@@ -22,34 +22,27 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::{env, path::PathBuf};
+pub mod drm;
+pub mod channel;
+pub mod gem;
+pub mod mapping;
+pub mod syncpoint;
 
-#[derive(Debug)]
-pub struct MakeMacroConstDefs;
-impl bindgen::callbacks::ParseCallbacks for MakeMacroConstDefs {
-    fn item_name(&self, original: &str) -> Option<String> {
-        Some(original.trim_start_matches("MK_").to_owned())
-    }
-}
+pub use drm::Drm;
+pub use channel::Channel;
+pub use gem::Gem;
+pub use mapping::Mapping;
+pub use syncpoint::Syncpoint;
 
-fn generate_bindings(wrapper: &str, out: &str) {
-    println!("cargo:rerun-if-changed={}", wrapper);
-
-    let bindings = bindgen::Builder::default()
-        .header(wrapper)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .parse_callbacks(Box::new(MakeMacroConstDefs))
-        .generate()
-        .expect("Failed to generate IOCTL bindings");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    bindings
-        .write_to_file(out_path.join(out))
-        .expect("Failed to write IOCTL bindings");
-}
-
-fn main() {
-    generate_bindings("tegra_drm_wrapper.h", "tegra_drm_bindings.rs");
-    generate_bindings("vic.h", "vic_bindings.rs");
-}
+ #[cfg(target_env = "musl")]
+ unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
+     /*
+      * We want to pass an unsigned int in through an int parameter,
+      * so need to transmute for a bit-exact copy..
+      */
+     libc::ioctl(fd, std::mem::transmute(ioc as u32), data)
+ }
+ #[cfg(not(target_env = "musl"))]
+ unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
+     libc::ioctl(fd, ioc, data)
+ }

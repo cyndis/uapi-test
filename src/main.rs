@@ -22,28 +22,12 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-pub mod host1x {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-
-    include!(concat!(env!("OUT_DIR"), "/host1x_bindings.rs"));
-}
-
-pub mod sync_file {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(unused)]
-
-    include!(concat!(env!("OUT_DIR"), "/sync_file_bindings.rs"));
-}
-
 pub mod tegra_drm {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
     #![allow(non_snake_case)]
     #![allow(unused)]
+    #![allow(deref_nullptr)]
 
     include!(concat!(env!("OUT_DIR"), "/tegra_drm_bindings.rs"));
 }
@@ -53,6 +37,7 @@ pub mod vic {
     #![allow(non_camel_case_types)]
     #![allow(non_snake_case)]
     #![allow(unused)]
+    #![allow(deref_nullptr)]
 
     include!(concat!(env!("OUT_DIR"), "/vic_bindings.rs"));
 
@@ -64,45 +49,60 @@ pub mod vic {
 }
 
 macro_rules! check {
-    ($e:expr) => {
-        if !($e) {
-            Err(format!("Check failed on {}:{}: {}", file!(),
-                        line!(), stringify!($e)))?;
+    ($a:expr, $($msg:tt)+) => {
+        {
+            let a = $a;
+
+            if !a {
+                anyhow::bail!(format!($($msg)+));
+            }
+        }
+    }
+}
+
+macro_rules! check_ok {
+    ($a:expr, $($msg:tt)+) => {
+        {
+            let a = $a;
+
+            if let Err(e) = a {
+                anyhow::bail!(format!($($msg)+, err=e));
+            }
         }
     }
 }
 
 macro_rules! check_eq {
-    ($a:expr, $b:expr) => {
-        let a_val = $a;
-        let b_val = $b;
-        if !(a_val == b_val) {
-            Err(format!("Check failed on {}:{}: Expected '{}' to be '{:?}', but it was '{:?}'",
-                        file!(), line!(),
-                        stringify!($a), b_val, a_val))?;
+    ($a:expr, $b:expr, $($msg:tt)+) => {
+        {
+            let a = $a;
+            let b = $b;
+
+            if a != b {
+                anyhow::bail!(format!($($msg)+, left=a));
+            }
         }
     }
 }
 
-macro_rules! check_unwrap {
-    ($e:expr) => {
+macro_rules! check_err {
+    ($a:expr, $b:expr, $($msg:tt)+) => {
         {
-            let val = $e;
-            if val.is_err() {
-                return Err(format!("Check failed on {}:{}: Expected '{}' to succeed, but it failed with '{:?}'",
-                            file!(), line!(), stringify!($e), val.unwrap_err()).into());
-            } else {
-                val.unwrap()
+            let a = $a;
+            let b = $b;
+
+            if a.err() != Some(b) {
+                anyhow::bail!(format!(concat!($($msg)+, "{left:.0?}"), left=a.err()));
             }
         }
     }
 }
 
 mod soc;
-mod types;
+mod uapi;
 
 use soc::Soc;
-use types::{Host1x, Drm};
+use uapi::Drm;
 
 pub type EResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub type IocResult<T> = Result<T, Errno>;
@@ -136,7 +136,6 @@ pub const EPERM: Errno = Errno(libc::EPERM);
 
 pub struct Main {
     soc: Soc,
-    host1x: Host1x,
     drm: Drm,
 
     engine_class: u32,
@@ -144,9 +143,13 @@ pub struct Main {
 
 mod test_syncpoints;
 mod test_channels;
+mod test_gem;
+mod test_submit;
 
 use test_syncpoints::*;
 use test_channels::*;
+use test_gem::*;
+use test_submit::*;
 
 #[derive(structopt::StructOpt)]
 #[structopt(name = "uapi-test", about = "Host1x UAPI test")]
@@ -171,7 +174,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Detected SoC: {}", soc);
     println!("---------------------------------------------------------");
 
-    let host1x = Host1x::open()?;
     let drm = Drm::open()?;
 
     let engine_class = match soc.chip_id() {
@@ -179,9 +181,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _                                => unimplemented!(),
     };
 
-    let main = Main { soc, host1x, drm, engine_class };
+    let main = Main { soc, drm, engine_class };
 
-    type Test = dyn Fn(&Main) -> EResult<()>;
+    type Test = dyn Fn(&Main) -> anyhow::Result<()>;
     let mut tests: Vec<(&str, Box<Test>)> = vec![];
 
     macro_rules! test {
@@ -189,33 +191,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     tests.push(test!(test_read_syncpoints));
-    tests.push(test!(test_allocate_syncpoint_invalid_ioctl));
+    tests.push(test!(test_incr_and_read_syncpoint));
     tests.push(test!(test_allocate_syncpoint));
-    tests.push(test!(test_increment_syncpoint));
-    tests.push(test!(test_increment_syncpoint_intr));
-    tests.push(test!(test_create_fence_invalid_ioctl));
-    tests.push(test!(test_create_fence));
-    tests.push(test!(test_create_fence_and_signal));
-    tests.push(test!(test_extract_fence));
 
     tests.push(test!(test_open_channel_invalid_ioctl));
     tests.push(test!(test_open_close_channel));
     tests.push(test!(test_engine_metadata));
-
-    tests.push(test!(test_gem_create_invalid_ioctl));
-    tests.push(test!(test_gem_mmap_invalid_ioctl));
-    tests.push(test!(test_gem_mmap));
-
     tests.push(test!(test_channel_map_invalid_ioctl));
     tests.push(test!(test_channel_map_unmap));
     tests.push(test!(test_channel_map_gem_close));
 
+    tests.push(test!(test_gem_mmap_invalid_ioctl));
+    tests.push(test!(test_gem_mmap));
+
     tests.push(test!(test_channel_submit_invalid_ioctl));
     tests.push(test!(test_channel_submit_increment_syncpoint_twice));
-
     tests.push(test!(test_channel_submit_wait));
 
-    if soc.chip_id() == 0x18 {
+    if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 {
         tests.push(test!(test_channel_buf_refcounting));
         tests.push(test!(test_channel_submit_vic_clear));
     }
@@ -256,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(e) => {
                 println!("Failed");
-                println!("  {}", e.to_string());
+                println!("  {:?}", e);
             }
         }
     }

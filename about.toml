@@ -1,0 +1,9 @@
+accepted = [
+    "MIT",
+]
+targets = [
+    "aarch64-unknown-linux-musl",
+    "armv7-unknown-linux-musleabi",
+]
+ignore-build-dependencies = true
+

@@ -9,7 +9,7 @@ ARGS?=
 
 CARGO_ENV=env $(LINKERS)
 ENV_64=RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-lgcc"
-	
+
 build-64:
 	$(CARGO_ENV) $(ENV_64) cargo build --release --target $(REMOTE_TARGET_64)
 	cp target/$(REMOTE_TARGET_64)/release/uapi-test ./uapi-test-64
@@ -20,7 +20,7 @@ build-32:
 
 run-remote-64: build-64
 	@sshpass -p '$(REMOTE_PASSWORD)' scp ./uapi-test-64 $(REMOTE_USER)@$(REMOTE):./
-	@sshpass -p '$(REMOTE_PASSWORD)' ssh $(REMOTE_USER)@$(REMOTE) ./uapi-test-64 $(ARGS)
+	@sshpass -p '$(REMOTE_PASSWORD)' ssh $(REMOTE_USER)@$(REMOTE) env RUST_LIB_BACKTRACE=1 ./uapi-test-64 $(ARGS)
 
 run-remote-32: build-32
 	@sshpass -p '$(REMOTE_PASSWORD)' scp ./uapi-test-32 $(REMOTE_USER)@$(REMOTE):./

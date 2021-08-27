@@ -22,34 +22,43 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::{env, path::PathBuf};
+use anyhow::Result;
 
-#[derive(Debug)]
-pub struct MakeMacroConstDefs;
-impl bindgen::callbacks::ParseCallbacks for MakeMacroConstDefs {
-    fn item_name(&self, original: &str) -> Option<String> {
-        Some(original.trim_start_matches("MK_").to_owned())
+use crate::{EINVAL, Main, tegra_drm};
+
+pub fn test_gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
+    let zero: tegra_drm::drm_tegra_gem_mmap = unsafe { std::mem::zeroed() };
+
+    {
+        let mut args = zero;
+        args.pad = 0xffff_ffff;
+        check_err!(main.drm.gem_mmap_raw(args), EINVAL, "expected EINVAL, got {left:?}");
     }
+
+    {
+        let mut args = zero;
+        args.handle = 0xdeadbeef;
+        check_err!(main.drm.gem_mmap_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+    }
+
+    Ok(())
 }
 
-fn generate_bindings(wrapper: &str, out: &str) {
-    println!("cargo:rerun-if-changed={}", wrapper);
+pub fn test_gem_mmap(main: &Main) -> Result<()> {
+    let gem = main.drm.gem_create(0x1000)?;
 
-    let bindings = bindgen::Builder::default()
-        .header(wrapper)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .parse_callbacks(Box::new(MakeMacroConstDefs))
-        .generate()
-        .expect("Failed to generate IOCTL bindings");
+    {
+        let mut mmap = gem.map(0x1000)?;
+        mmap[16] = 0xda;
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        check_eq!(mmap[16], 0xda, "mmap write/read check failed, got {left}");
+    }
 
-    bindings
-        .write_to_file(out_path.join(out))
-        .expect("Failed to write IOCTL bindings");
-}
+    {
+        let mmap = gem.map(0x1000)?;
 
-fn main() {
-    generate_bindings("tegra_drm_wrapper.h", "tegra_drm_bindings.rs");
-    generate_bindings("vic.h", "vic_bindings.rs");
+        check_eq!(mmap[16], 0xda, "mmap write/read check on remap failed, got {left}");
+    }
+
+    Ok(())
 }
