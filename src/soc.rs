@@ -41,6 +41,7 @@ impl Soc {
             0x40 | 0x13 => 192,
             0x18 => 576,
             0x19 => 704,
+            0x23 => 1024,
             _    => unimplemented!()
         }
     }
@@ -69,6 +70,7 @@ impl std::fmt::Display for Soc {
             0x21 => "Tegra210",
             0x18 => "Tegra186",
             0x19 => "Tegra194",
+            0x23 => "Tegra234",
             _ => unimplemented!()
         };
 

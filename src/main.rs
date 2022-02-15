@@ -208,7 +208,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tests.push(test!(test_channel_submit_increment_syncpoint_twice));
     tests.push(test!(test_channel_submit_wait));
 
-    if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 {
+    if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 || soc.chip_id() == 0x23 {
         tests.push(test!(test_channel_buf_refcounting));
         tests.push(test!(test_channel_submit_vic_clear));
     }
