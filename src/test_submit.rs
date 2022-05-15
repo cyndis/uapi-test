@@ -241,7 +241,7 @@ pub fn test_channel_submit_timeout(main: &Main) -> Result<()> {
 
         let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
         incr.id = ctx.syncpt.id();
-        incr.increments = 2;
+        incr.increments = 3;
         ctx.incr.push(incr);
 
         ctx.gather_data.extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
