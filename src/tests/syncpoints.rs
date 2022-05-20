@@ -22,7 +22,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use crate::{Main, EINVAL, EBUSY};
+use crate::{Main, EBUSY, EINVAL};
 use anyhow::Result;
 
 pub fn test_read_syncpoints(main: &Main) -> Result<()> {
@@ -33,7 +33,8 @@ pub fn test_read_syncpoints(main: &Main) -> Result<()> {
     }
 
     check_eq!(
-        main.drm.read_syncpoint(main.soc.num_syncpoints() + 1), Err(EINVAL),
+        main.drm.read_syncpoint(main.soc.num_syncpoints() + 1),
+        Err(EINVAL),
         "reading invalid syncpoint returned {left:?}"
     );
 
@@ -44,12 +45,22 @@ pub fn test_incr_and_read_syncpoint(main: &Main) -> Result<()> {
     let sp = main.drm.allocate_syncpoint()?;
     let value = main.drm.read_syncpoint(sp.id())?;
     main.drm.increment_syncpoint(sp.id())?;
-    check!(main.drm.read_syncpoint(sp.id())? == value.wrapping_add(1), "read value did not increment (standard)");
+    check!(
+        main.drm.read_syncpoint(sp.id())? == value.wrapping_add(1),
+        "read value did not increment (standard)"
+    );
 
     let sp = main.drm.allocate_syncpoint()?;
-    let value = main.drm.read_syncpoint_with_threshold(sp.id(), 0x7fff_ffff)?;
+    let value = main
+        .drm
+        .read_syncpoint_with_threshold(sp.id(), 0x7fff_ffff)?;
     main.drm.increment_syncpoint(sp.id())?;
-    check!(main.drm.read_syncpoint_with_threshold(sp.id(), 0x7fff_ffff)? == value.wrapping_add(1), "read value did not increment (standard)");
+    check!(
+        main.drm
+            .read_syncpoint_with_threshold(sp.id(), 0x7fff_ffff)?
+            == value.wrapping_add(1),
+        "read value did not increment (standard)"
+    );
 
     Ok(())
 }
@@ -74,14 +85,21 @@ pub fn test_allocate_syncpoint(main: &Main) -> Result<()> {
 
     for sp in &sps {
         let id = sp.id();
-        check!(id < main.soc.num_syncpoints(), "syncpoint ID {} exceeds hardware maximum", id);
+        check!(
+            id < main.soc.num_syncpoints(),
+            "syncpoint ID {} exceeds hardware maximum",
+            id
+        );
     }
 
     let last_id = sps.pop().unwrap().id();
 
     let sp = main.drm.allocate_syncpoint()?;
     let id = sp.id();
-    check!(id == last_id, "freeing and reallocating resulted in different syncpoint");
+    check!(
+        id == last_id,
+        "freeing and reallocating resulted in different syncpoint"
+    );
 
     Ok(())
 }

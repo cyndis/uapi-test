@@ -42,7 +42,7 @@ impl Soc {
             0x18 => 576,
             0x19 => 704,
             0x23 => 1024,
-            _    => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 
@@ -71,7 +71,7 @@ impl std::fmt::Display for Soc {
             0x18 => "Tegra186",
             0x19 => "Tegra194",
             0x23 => "Tegra234",
-            _ => unimplemented!()
+            _ => unimplemented!(),
         };
 
         write!(f, "{}", s)

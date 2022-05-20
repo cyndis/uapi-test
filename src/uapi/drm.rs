@@ -22,9 +22,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use crate::{IocResult, EResult, Errno};
+use super::{ioctl, Channel, Gem, Mapping, Syncpoint};
 use crate::tegra_drm::*;
-use super::{ioctl, Syncpoint, Channel, Mapping, Gem};
+use crate::{EResult, Errno, IocResult};
 
 use std::os::unix::io::AsRawFd;
 
@@ -82,7 +82,10 @@ impl Drm {
 
             args = self.allocate_syncpoint_raw(args)?;
 
-            Ok(Syncpoint { drm: self, id: args.id })
+            Ok(Syncpoint {
+                drm: self,
+                id: args.id,
+            })
         }
     }
 
@@ -122,18 +125,11 @@ impl Drm {
         }
     }
 
-    pub fn read_syncpoint(
-        &self,
-        id: u32,
-    ) -> IocResult<u32> {
+    pub fn read_syncpoint(&self, id: u32) -> IocResult<u32> {
         self.read_syncpoint_with_threshold(id, 0)
     }
 
-    pub fn read_syncpoint_with_threshold(
-        &self,
-        id: u32,
-        threshold: u32,
-    ) -> IocResult<u32> {
+    pub fn read_syncpoint_with_threshold(&self, id: u32, threshold: u32) -> IocResult<u32> {
         unsafe {
             let mut args: drm_tegra_syncpoint_wait = std::mem::zeroed();
 
@@ -141,7 +137,11 @@ impl Drm {
             args.id = id;
             args.threshold = threshold;
 
-            let err = ioctl(self.fd.as_raw_fd(), DRM_IOCTL_TEGRA_SYNCPOINT_WAIT, &mut args);
+            let err = ioctl(
+                self.fd.as_raw_fd(),
+                DRM_IOCTL_TEGRA_SYNCPOINT_WAIT,
+                &mut args,
+            );
             if err != 0 {
                 let errno = Errno::get();
                 if errno.0 != libc::EAGAIN {

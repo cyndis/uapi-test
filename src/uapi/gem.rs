@@ -22,8 +22,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use crate::tegra_drm::*;
 use super::Drm;
+use crate::tegra_drm::*;
 
 pub struct Gem<'a> {
     pub(super) drm: &'a Drm,

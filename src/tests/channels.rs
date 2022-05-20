@@ -32,19 +32,31 @@ pub fn test_open_channel_invalid_ioctl(main: &Main) -> Result<()> {
     {
         let mut args = zero;
         args.flags = 0xffff_ffff;
-        check_err!(main.drm.open_channel_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.open_channel_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     {
         let mut args = zero;
         args.host1x_class = 0x0;
-        check_err!(main.drm.open_channel_raw(args), ENODEV, "expected ENODEV, got {left:?}");
+        check_err!(
+            main.drm.open_channel_raw(args),
+            ENODEV,
+            "expected ENODEV, got {left:?}"
+        );
     }
 
     {
         let mut args = zero;
         args.host1x_class = 0xff;
-        check_err!(main.drm.open_channel_raw(args), ENODEV, "expected ENODEV, got {left:?}");
+        check_err!(
+            main.drm.open_channel_raw(args),
+            ENODEV,
+            "expected ENODEV, got {left:?}"
+        );
     }
 
     Ok(())
@@ -58,7 +70,11 @@ pub fn test_open_close_channel(main: &Main) -> Result<()> {
         let mut args = zero;
         args.context = channel.context();
         main.drm.close_channel_raw(args)?;
-        check_err!(main.drm.close_channel_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.close_channel_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     Ok(())
@@ -67,7 +83,11 @@ pub fn test_open_close_channel(main: &Main) -> Result<()> {
 pub fn test_engine_metadata(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
 
-    check_eq!(channel.hw_version(), main.soc.chip_id(), "hw_version doesn't match chip id: {left}");
+    check_eq!(
+        channel.hw_version(),
+        main.soc.chip_id(),
+        "hw_version doesn't match chip id: {left}"
+    );
 
     Ok(())
 }
@@ -80,14 +100,22 @@ pub fn test_channel_map_invalid_ioctl(main: &Main) -> Result<()> {
     {
         let mut args = zero;
         args.context = 0;
-        check_err!(main.drm.channel_map_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.channel_map_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     {
         let mut args = zero;
         args.context = channel.context();
         args.handle = 0xdeadbeef;
-        check_err!(main.drm.channel_map_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.channel_map_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     let gem = main.drm.gem_create(0x1000)?;
@@ -97,7 +125,11 @@ pub fn test_channel_map_invalid_ioctl(main: &Main) -> Result<()> {
         args.context = channel.context();
         args.flags = 0xffffffff;
         args.handle = gem.handle();
-        check_err!(main.drm.channel_map_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.channel_map_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     Ok(())
@@ -115,7 +147,11 @@ pub fn test_channel_map_unmap(main: &Main) -> Result<()> {
         args.mapping = m.id();
 
         main.drm.channel_unmap_raw(args)?;
-        check_err!(main.drm.channel_unmap_raw(args), EINVAL, "expected EINVAL when double unmapping, got {left:?}");
+        check_err!(
+            main.drm.channel_unmap_raw(args),
+            EINVAL,
+            "expected EINVAL when double unmapping, got {left:?}"
+        );
         std::mem::forget(m);
     }
 

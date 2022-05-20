@@ -24,7 +24,7 @@
 
 use anyhow::Result;
 
-use crate::{EINVAL, Main, tegra_drm};
+use crate::{tegra_drm, Main, EINVAL};
 
 pub fn test_gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     let zero: tegra_drm::drm_tegra_gem_mmap = unsafe { std::mem::zeroed() };
@@ -32,13 +32,21 @@ pub fn test_gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     {
         let mut args = zero;
         args.pad = 0xffff_ffff;
-        check_err!(main.drm.gem_mmap_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.gem_mmap_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     {
         let mut args = zero;
         args.handle = 0xdeadbeef;
-        check_err!(main.drm.gem_mmap_raw(args), EINVAL, "expected EINVAL, got {left:?}");
+        check_err!(
+            main.drm.gem_mmap_raw(args),
+            EINVAL,
+            "expected EINVAL, got {left:?}"
+        );
     }
 
     Ok(())
@@ -57,7 +65,11 @@ pub fn test_gem_mmap(main: &Main) -> Result<()> {
     {
         let mmap = gem.map(0x1000)?;
 
-        check_eq!(mmap[16], 0xda, "mmap write/read check on remap failed, got {left}");
+        check_eq!(
+            mmap[16],
+            0xda,
+            "mmap write/read check on remap failed, got {left}"
+        );
     }
 
     Ok(())

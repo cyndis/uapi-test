@@ -48,6 +48,19 @@ pub mod vic {
     unsafe impl bytemuck::Zeroable for OutputSurfaceConfig {}
 }
 
+pub mod nvdec {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+    #![allow(unused)]
+    #![allow(deref_nullptr)]
+
+    include!(concat!(env!("OUT_DIR"), "/nvdec_bindings.rs"));
+
+    unsafe impl bytemuck::Pod for nvdec_mpeg2_pic_s {}
+    unsafe impl bytemuck::Zeroable for nvdec_mpeg2_pic_s {}
+}
+
 macro_rules! check {
     ($a:expr, $($msg:tt)+) => {
         {
@@ -118,12 +131,16 @@ impl Errno {
 
 impl std::fmt::Display for Errno {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<Errno {} '{}'>", self.0, errno::Errno(self.0).to_string())
+        write!(
+            f,
+            "<Errno {} '{}'>",
+            self.0,
+            errno::Errno(self.0).to_string()
+        )
     }
 }
 
-impl std::error::Error for Errno {
-}
+impl std::error::Error for Errno {}
 
 pub const EINVAL: Errno = Errno(libc::EINVAL);
 pub const EBUSY: Errno = Errno(libc::EBUSY);
@@ -141,15 +158,7 @@ pub struct Main {
     engine_class: u32,
 }
 
-mod test_syncpoints;
-mod test_channels;
-mod test_gem;
-mod test_submit;
-
-use test_syncpoints::*;
-use test_channels::*;
-use test_gem::*;
-use test_submit::*;
+mod tests;
 
 #[derive(structopt::StructOpt)]
 #[structopt(name = "uapi-test", about = "Host1x UAPI test")]
@@ -177,43 +186,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let drm = Drm::open()?;
 
     let engine_class = match soc.chip_id() {
-        0x12 | 0x21 | 0x18 | 0x19 | 0x23 => 0x5d /* VIC */,
-        _                                => unimplemented!(),
+        0x12 | 0x21 | 0x18 | 0x19 | 0x23 => 0x5d, /* VIC */
+        _ => unimplemented!(),
     };
 
-    let main = Main { soc, drm, engine_class };
+    let main = Main {
+        soc,
+        drm,
+        engine_class,
+    };
 
     type Test = dyn Fn(&Main) -> anyhow::Result<()>;
     let mut tests: Vec<(&str, Box<Test>)> = vec![];
 
     macro_rules! test {
-        ($e:expr) => ((stringify!($e), Box::new($e)))
+        ($e:expr) => {
+            (stringify!($e), Box::new($e))
+        };
     }
 
-    tests.push(test!(test_read_syncpoints));
-    tests.push(test!(test_incr_and_read_syncpoint));
-    tests.push(test!(test_allocate_syncpoint));
+    {
+        use tests::{channels::*, gem::*, nvdec::*, submit::*, syncpoints::*};
+        tests.push(test!(test_read_syncpoints));
+        tests.push(test!(test_incr_and_read_syncpoint));
+        tests.push(test!(test_allocate_syncpoint));
 
-    tests.push(test!(test_open_channel_invalid_ioctl));
-    tests.push(test!(test_open_close_channel));
-    tests.push(test!(test_engine_metadata));
-    tests.push(test!(test_channel_map_invalid_ioctl));
-    tests.push(test!(test_channel_map_unmap));
-    tests.push(test!(test_channel_map_gem_close));
+        tests.push(test!(test_open_channel_invalid_ioctl));
+        tests.push(test!(test_open_close_channel));
+        tests.push(test!(test_engine_metadata));
+        tests.push(test!(test_channel_map_invalid_ioctl));
+        tests.push(test!(test_channel_map_unmap));
+        tests.push(test!(test_channel_map_gem_close));
 
-    tests.push(test!(test_gem_mmap_invalid_ioctl));
-    tests.push(test!(test_gem_mmap));
+        tests.push(test!(test_gem_mmap_invalid_ioctl));
+        tests.push(test!(test_gem_mmap));
 
-    tests.push(test!(test_channel_submit_invalid_ioctl));
-    tests.push(test!(test_channel_submit_increment_syncpoint_twice));
-    tests.push(test!(test_channel_submit_wait));
+        tests.push(test!(test_channel_submit_invalid_ioctl));
+        tests.push(test!(test_channel_submit_increment_syncpoint_twice));
+        tests.push(test!(test_channel_submit_wait));
 
-    if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 || soc.chip_id() == 0x23 {
-        tests.push(test!(test_channel_buf_refcounting));
-        tests.push(test!(test_channel_submit_vic_clear));
+        if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 || soc.chip_id() == 0x23 {
+            tests.push(test!(test_channel_buf_refcounting));
+            tests.push(test!(test_channel_submit_vic_clear));
+        }
+
+        tests.push(test!(test_nvdec_mpeg2));
+
+        tests.push(test!(test_channel_submit_timeout));
     }
-
-    tests.push(test!(test_channel_submit_timeout));
 
     if args.list {
         for (name, _) in tests {
@@ -255,8 +275,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("---------------------------------------------------------");
-    println!("{} tests total. {} run, {} skipped", num_total, num_run, num_total-num_run);
-    println!("{} passed, {} failed", num_passed, num_run-num_passed);
+    println!(
+        "{} tests total. {} run, {} skipped",
+        num_total,
+        num_run,
+        num_total - num_run
+    );
+    println!("{} passed, {} failed", num_passed, num_run - num_passed);
 
     if num_run != num_passed {
         Err("Tests failed".to_string())?;
