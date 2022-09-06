@@ -160,12 +160,43 @@ pub struct Main {
 
 mod tests;
 
+#[derive(Copy, Clone)]
+enum Engine {
+    Vic,
+    Nvdec,
+}
+
+impl Engine {
+    fn class(self) -> u32 {
+        match self {
+            Engine::Vic => 0x5d,
+            Engine::Nvdec => 0xf0,
+        }
+    }
+}
+
+impl std::str::FromStr for Engine {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "vic" => Engine::Vic,
+            "nvdec" => Engine::Nvdec,
+            _ => return Err("unsupported engine"),
+        })
+    }
+}
+
 #[derive(structopt::StructOpt)]
 #[structopt(name = "uapi-test", about = "Host1x UAPI test")]
 struct Args {
     /// Only list the available tests.
     #[structopt(short, long)]
     list: bool,
+
+    /// Engine to use for engine-independent tests. Defaults to 'vic'. Options: vic, nvdec
+    #[structopt(short, long)]
+    engine: Option<Engine>,
 
     /// Test filter. Only run the specified test.
     #[structopt(name = "FILTER")]
@@ -185,15 +216,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let drm = Drm::open()?;
 
-    let engine_class = match soc.chip_id() {
-        0x12 | 0x21 | 0x18 | 0x19 | 0x23 => 0x5d, /* VIC */
-        _ => unimplemented!(),
-    };
+    let engine = args.engine.unwrap_or(Engine::Vic);
 
     let main = Main {
         soc,
         drm,
-        engine_class,
+        engine_class: engine.class(),
     };
 
     type Test = dyn Fn(&Main) -> anyhow::Result<()>;
