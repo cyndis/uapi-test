@@ -1,0 +1,9 @@
+[package]
+name = "run-bindgen"
+version = "0.1.0"
+authors = ["Mikko Perttunen <cyndis@kapsi.fi>"]
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+bindgen = { version = "0.53", default-features = false }

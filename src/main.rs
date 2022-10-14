@@ -29,7 +29,7 @@ pub mod tegra_drm {
     #![allow(unused)]
     #![allow(deref_nullptr)]
 
-    include!(concat!(env!("OUT_DIR"), "/tegra_drm_bindings.rs"));
+    include!("generated-bindings/tegra_drm_bindings.rs");
 }
 
 pub mod vic {
@@ -39,7 +39,7 @@ pub mod vic {
     #![allow(unused)]
     #![allow(deref_nullptr)]
 
-    include!(concat!(env!("OUT_DIR"), "/vic_bindings.rs"));
+    include!("generated-bindings/vic_bindings.rs");
 
     unsafe impl bytemuck::Pod for OutputConfig {}
     unsafe impl bytemuck::Zeroable for OutputConfig {}
@@ -55,7 +55,7 @@ pub mod nvdec {
     #![allow(unused)]
     #![allow(deref_nullptr)]
 
-    include!(concat!(env!("OUT_DIR"), "/nvdec_bindings.rs"));
+    include!("generated-bindings/nvdec_bindings.rs");
 
     unsafe impl bytemuck::Pod for nvdec_mpeg2_pic_s {}
     unsafe impl bytemuck::Zeroable for nvdec_mpeg2_pic_s {}

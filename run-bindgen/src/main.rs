@@ -33,8 +33,6 @@ impl bindgen::callbacks::ParseCallbacks for MakeMacroConstDefs {
 }
 
 fn generate_bindings(wrapper: &str, out: &str) {
-    println!("cargo:rerun-if-changed={}", wrapper);
-
     let bindings = bindgen::Builder::default()
         .header(wrapper)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
