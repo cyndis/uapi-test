@@ -114,10 +114,12 @@ macro_rules! check_err {
 mod soc;
 mod uapi;
 
+mod nv_extensions;
+
 use soc::Soc;
 use uapi::Drm;
 
-pub type EResult<T> = Result<T, Box<dyn std::error::Error>>;
+pub type EResult<T> = anyhow::Result<T>;
 pub type IocResult<T> = Result<T, Errno>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -261,6 +263,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tests.push(test!(test_nvdec_mpeg2));
 
         tests.push(test!(test_channel_submit_timeout));
+        /* NVIDIA internal tests */
+        use nv_extensions::tests as nv_extensions;
+        tests.push(test!(nv_extensions::create_extract_fence_roundtrip));
+        tests.push(test!(nv_extensions::created_fence_wait));
+        tests.push(test!(nv_extensions::create_destroy_pollfd));
+        tests.push(test!(nv_extensions::basic_pollfd));
+        tests.push(test!(nv_extensions::poll_during_trigger_pollfd));
+        tests.push(test!(nv_extensions::past_threshold_pollfd));
+        tests.push(test!(nv_extensions::retrigger_pollfd));
     }
 
     if args.list {

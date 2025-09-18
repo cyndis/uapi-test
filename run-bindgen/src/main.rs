@@ -51,4 +51,6 @@ fn main() {
     generate_bindings("tegra_drm_wrapper.h", "tegra_drm_bindings.rs");
     generate_bindings("engine-hdr/vic.h", "vic_bindings.rs");
     generate_bindings("engine-hdr/nvdec.h", "nvdec_bindings.rs");
+
+    generate_bindings("host1x-fence_wrapper.h", "host1x-fence_bindings.rs");
 }
