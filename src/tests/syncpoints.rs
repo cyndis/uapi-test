@@ -23,7 +23,7 @@
  */
 
 use crate::{Main, EBUSY, EINVAL};
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 pub fn read_syncpoints(main: &Main) -> Result<()> {
     for i in 0..main.soc.num_syncpoints() {
@@ -100,6 +100,130 @@ pub fn allocate_syncpoint(main: &Main) -> Result<()> {
         id == last_id,
         "freeing and reallocating resulted in different syncpoint"
     );
+
+    Ok(())
+}
+
+pub fn wait_all_syncpoints(main: &Main) -> Result<()> {
+    let mut sps = vec![];
+    loop {
+        let sp = main.drm.allocate_syncpoint();
+
+        match sp {
+            Ok(sp) => {
+                sps.push(sp);
+            }
+            Err(EBUSY) => {
+                break;
+            }
+            Err(e) => {
+                anyhow::bail!("could not allocate syncpoint: {}", e);
+            }
+        }
+    }
+
+    for sp in &sps {
+        let id = sp.id();
+        let value = main
+            .drm
+            .read_syncpoint(sp.id())
+            .context("failed to read syncpoint value")?;
+
+        std::thread::scope(|s| {
+            let thread = s.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                main.drm.increment_syncpoint(id).unwrap();
+            });
+
+            main.drm
+                .wait_syncpoint(
+                    sp.id(),
+                    value.wrapping_add(1),
+                    std::time::Duration::from_millis(50),
+                )
+                .context("wait timed out")?;
+            thread
+                .join()
+                .map_err(|_| anyhow::anyhow!("thread failed"))?;
+
+            let r: Result<_> = Ok(());
+            r
+        })?;
+    }
+
+    Ok(())
+}
+
+pub fn wait_syncpoint_multiple(main: &Main) -> Result<()> {
+    let sp = main
+        .drm
+        .allocate_syncpoint()
+        .context("failed to allocate syncpoint")?;
+    let value = main
+        .drm
+        .read_syncpoint(sp.id())
+        .context("failed to read syncpoint value")?;
+
+    std::thread::scope(|s| {
+        let handles = (0..100)
+            .map(|_| {
+                s.spawn(|| {
+                    main.drm.wait_syncpoint(
+                        sp.id(),
+                        value.wrapping_add(1),
+                        std::time::Duration::from_millis(1000),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        main.drm.increment_syncpoint(sp.id())?;
+
+        for handle in handles {
+            handle.join().unwrap()?;
+        }
+
+        Ok::<(), anyhow::Error>(())
+    })?;
+
+    Ok(())
+}
+
+pub fn timeout_correctness(main: &Main) -> Result<()> {
+    let sp = main
+        .drm
+        .allocate_syncpoint()
+        .context("failed to allocate syncpoint")?;
+    let value = main
+        .drm
+        .read_syncpoint(sp.id())
+        .context("failed to read syncpoint value")?;
+
+    let _ = std::thread::scope(|s| {
+        for iter in 1..1000 {
+            s.spawn(|| {
+                main.drm.increment_syncpoint(sp.id()).unwrap();
+            });
+
+            let a = std::time::Instant::now();
+            let result = main.drm.wait_syncpoint(
+                sp.id(),
+                value.wrapping_add(iter),
+                std::time::Duration::from_millis(1),
+            );
+            let b = std::time::Instant::now();
+
+            let delta = b.duration_since(a);
+            check!(
+                result.is_ok() || delta.as_micros() >= 1000,
+                "returned error even though wait completed within timeout"
+            );
+        }
+
+        Ok(())
+    });
 
     Ok(())
 }

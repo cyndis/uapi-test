@@ -246,6 +246,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tests.push(test!(read_syncpoints));
         tests.push(test!(incr_and_read_syncpoint));
         tests.push(test!(allocate_syncpoint));
+        tests.push(test!(wait_syncpoint_multiple));
+        tests.push(test!(timeout_correctness));
+        tests.push(test!(wait_all_syncpoints));
 
         tests.push(test!(open_channel_invalid_ioctl));
         tests.push(test!(open_close_channel));
