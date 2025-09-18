@@ -243,32 +243,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         use tests::{channels::*, gem::*, nvdec::*, submit::*, syncpoints::*};
-        tests.push(test!(test_read_syncpoints));
-        tests.push(test!(test_incr_and_read_syncpoint));
-        tests.push(test!(test_allocate_syncpoint));
+        tests.push(test!(read_syncpoints));
+        tests.push(test!(incr_and_read_syncpoint));
+        tests.push(test!(allocate_syncpoint));
 
-        tests.push(test!(test_open_channel_invalid_ioctl));
-        tests.push(test!(test_open_close_channel));
-        tests.push(test!(test_engine_metadata));
-        tests.push(test!(test_channel_map_invalid_ioctl));
-        tests.push(test!(test_channel_map_unmap));
-        tests.push(test!(test_channel_map_gem_close));
+        tests.push(test!(open_channel_invalid_ioctl));
+        tests.push(test!(open_close_channel));
+        tests.push(test!(engine_metadata));
+        tests.push(test!(channel_map_invalid_ioctl));
+        tests.push(test!(channel_map_unmap));
+        tests.push(test!(channel_map_gem_close));
 
-        tests.push(test!(test_gem_mmap_invalid_ioctl));
-        tests.push(test!(test_gem_mmap));
+        tests.push(test!(gem_mmap_invalid_ioctl));
+        tests.push(test!(gem_mmap));
 
-        tests.push(test!(test_channel_submit_invalid_ioctl));
-        tests.push(test!(test_channel_submit_increment_syncpoint_twice));
-        tests.push(test!(test_channel_submit_wait));
+        tests.push(test!(channel_submit_invalid_ioctl));
+        tests.push(test!(channel_submit_increment_syncpoint_twice));
+        tests.push(test!(channel_submit_wait));
 
         if soc.chip_id() == 0x18 || soc.chip_id() == 0x19 || soc.chip_id() == 0x23 {
-            tests.push(test!(test_channel_buf_refcounting));
-            tests.push(test!(test_channel_submit_vic_clear));
+            tests.push(test!(channel_buf_refcounting));
+            tests.push(test!(channel_submit_vic_clear));
         }
 
-        tests.push(test!(test_nvdec_mpeg2));
+        tests.push(test!(nvdec_mpeg2));
 
-        tests.push(test!(test_channel_submit_timeout));
+        tests.push(test!(channel_submit_timeout));
+
         /* NVIDIA internal tests */
         use nv_extensions::tests as nv_extensions;
         tests.push(test!(nv_extensions::create_extract_fence_roundtrip));

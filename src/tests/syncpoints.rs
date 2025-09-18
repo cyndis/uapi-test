@@ -25,7 +25,7 @@
 use crate::{Main, EBUSY, EINVAL};
 use anyhow::Result;
 
-pub fn test_read_syncpoints(main: &Main) -> Result<()> {
+pub fn read_syncpoints(main: &Main) -> Result<()> {
     for i in 0..main.soc.num_syncpoints() {
         let value = main.drm.read_syncpoint(i);
 
@@ -41,7 +41,7 @@ pub fn test_read_syncpoints(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_incr_and_read_syncpoint(main: &Main) -> Result<()> {
+pub fn incr_and_read_syncpoint(main: &Main) -> Result<()> {
     let sp = main.drm.allocate_syncpoint()?;
     let value = main.drm.read_syncpoint(sp.id())?;
     main.drm.increment_syncpoint(sp.id())?;
@@ -65,7 +65,7 @@ pub fn test_incr_and_read_syncpoint(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_allocate_syncpoint(main: &Main) -> Result<()> {
+pub fn allocate_syncpoint(main: &Main) -> Result<()> {
     let mut sps = vec![];
     loop {
         let sp = main.drm.allocate_syncpoint();

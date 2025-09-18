@@ -26,7 +26,7 @@ use anyhow::Result;
 
 use crate::{tegra_drm, Main, EINVAL};
 
-pub fn test_gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
+pub fn gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     let zero: tegra_drm::drm_tegra_gem_mmap = unsafe { std::mem::zeroed() };
 
     {
@@ -52,7 +52,7 @@ pub fn test_gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_gem_mmap(main: &Main) -> Result<()> {
+pub fn gem_mmap(main: &Main) -> Result<()> {
     let gem = main.drm.gem_create(0x1000)?;
 
     {

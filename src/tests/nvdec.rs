@@ -47,7 +47,7 @@ const QUANT_MAT_8X8NONINTRA: [u8; 64] = [
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
 ];
 
-pub fn test_nvdec_mpeg2(main: &Main) -> Result<()> {
+pub fn nvdec_mpeg2(main: &Main) -> Result<()> {
     let cfg_gem = main.drm.gem_create(0x1000)?;
     let mut cfg_map = cfg_gem.map(0x1000)?;
     {

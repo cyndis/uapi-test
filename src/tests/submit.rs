@@ -31,7 +31,7 @@ use crate::{
     vic, Errno, Main, EFAULT, EINVAL, EPERM,
 };
 
-pub fn test_channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
+pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     fn submit(main: &Main, f: impl FnOnce(&mut SubmitTestCtx)) -> Result<Option<Errno>> {
         submit_test(main, main.engine_class, |mut ctx| {
             ctx.push_syncpt_incr(0);
@@ -93,7 +93,7 @@ pub fn test_channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
+pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         let base_value = main.drm.read_syncpoint(ctx.syncpt_id)?;
 
@@ -118,7 +118,7 @@ pub fn test_channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> 
     })
 }
 
-pub fn test_channel_submit_vic_clear(main: &Main) -> Result<()> {
+pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
     let cfg_gem = main.drm.gem_create(0x1000)?;
     let mut cfg_map = cfg_gem.map(0x1000)?;
 
@@ -187,7 +187,7 @@ pub fn test_channel_submit_vic_clear(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_channel_submit_timeout(main: &Main) -> Result<()> {
+pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         /* First, submit failing job */
 
@@ -264,7 +264,7 @@ pub fn test_channel_submit_timeout(main: &Main) -> Result<()> {
     })
 }
 
-pub fn test_channel_submit_wait(main: &Main) -> Result<()> {
+pub fn channel_submit_wait(main: &Main) -> Result<()> {
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
     let value = main.drm.read_syncpoint(syncpt_id)?;
@@ -326,7 +326,7 @@ pub fn test_channel_submit_wait(main: &Main) -> Result<()> {
     })
 }
 
-pub fn test_channel_buf_refcounting(main: &Main) -> Result<()> {
+pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
     let value = main.drm.read_syncpoint(syncpt_id)?;

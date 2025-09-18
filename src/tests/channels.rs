@@ -26,7 +26,7 @@ use anyhow::Result;
 
 use crate::{tegra_drm, Main, EINVAL, ENODEV};
 
-pub fn test_open_channel_invalid_ioctl(main: &Main) -> Result<()> {
+pub fn open_channel_invalid_ioctl(main: &Main) -> Result<()> {
     let zero: tegra_drm::drm_tegra_channel_open = unsafe { std::mem::zeroed() };
 
     {
@@ -62,7 +62,7 @@ pub fn test_open_channel_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_open_close_channel(main: &Main) -> Result<()> {
+pub fn open_close_channel(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let zero: tegra_drm::drm_tegra_channel_close = unsafe { std::mem::zeroed() };
 
@@ -80,7 +80,7 @@ pub fn test_open_close_channel(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_engine_metadata(main: &Main) -> Result<()> {
+pub fn engine_metadata(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
 
     check_eq!(
@@ -92,7 +92,7 @@ pub fn test_engine_metadata(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_channel_map_invalid_ioctl(main: &Main) -> Result<()> {
+pub fn channel_map_invalid_ioctl(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
 
     let zero: tegra_drm::drm_tegra_channel_map = unsafe { std::mem::zeroed() };
@@ -135,7 +135,7 @@ pub fn test_channel_map_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_channel_map_unmap(main: &Main) -> Result<()> {
+pub fn channel_map_unmap(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let gem = main.drm.gem_create(0x1000)?;
 
@@ -158,7 +158,7 @@ pub fn test_channel_map_unmap(main: &Main) -> Result<()> {
     Ok(())
 }
 
-pub fn test_channel_map_gem_close(main: &Main) -> Result<()> {
+pub fn channel_map_gem_close(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let gem = main.drm.gem_create(0x1000)?;
     let m = main.drm.channel_map(&channel, &gem, 0x0, 0x1000, false)?;
