@@ -298,7 +298,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         num_total += 1;
 
         if let Some(ref filter) = args.filter {
-            if filter != name {
+            if !name.contains(filter) {
                 continue;
             }
         }
