@@ -166,6 +166,8 @@ mod tests;
 enum Engine {
     Vic,
     Nvdec,
+    Ofa,
+    Nvenc,
 }
 
 impl Engine {
@@ -173,6 +175,8 @@ impl Engine {
         match self {
             Engine::Vic => 0x5d,
             Engine::Nvdec => 0xf0,
+            Engine::Ofa => 0xf8,
+            Engine::Nvenc => 0x21,
         }
     }
 }
@@ -184,6 +188,8 @@ impl std::str::FromStr for Engine {
         Ok(match s {
             "vic" => Engine::Vic,
             "nvdec" => Engine::Nvdec,
+            "ofa" => Engine::Ofa,
+            "nvenc" => Engine::Nvenc,
             _ => return Err("unsupported engine"),
         })
     }
@@ -196,7 +202,7 @@ struct Args {
     #[structopt(short, long)]
     list: bool,
 
-    /// Engine to use for engine-independent tests. Defaults to 'vic'. Options: vic, nvdec
+    /// Engine to use for engine-independent tests. Defaults to 'vic'. Options: vic, nvdec, ofa, nvenc
     #[structopt(short, long)]
     engine: Option<Engine>,
 
