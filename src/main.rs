@@ -111,6 +111,7 @@ macro_rules! check_err {
     }
 }
 
+mod kmemleak;
 mod soc;
 mod uapi;
 
@@ -301,6 +302,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut num_run = 0;
     let mut num_passed = 0;
 
+    let kmemleak = match kmemleak::Session::start() {
+        Ok(session) => Some(session),
+        Err(kmemleak::Error::NotSupported) => {
+            println!("NOTE: kmemleak interface is not available");
+            None
+        }
+        Err(e) => {
+            println!("ERROR: Failed to start kmemleak session: {}", e);
+            None
+        }
+    };
+
     for (name, test) in tests {
         use std::io::Write;
 
@@ -336,6 +349,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         num_total - num_run
     );
     println!("{} passed, {} failed", num_passed, num_run - num_passed);
+
+    if let Some(kmemleak) = kmemleak {
+        match kmemleak.finish()? {
+            Some(report) => {
+                println!("Memory leak(s) found:");
+                println!("{}", report);
+            }
+            None => {
+                println!("No memory leaks detected.");
+            }
+        }
+    }
 
     if num_run != num_passed {
         Err("Tests failed".to_string())?;
