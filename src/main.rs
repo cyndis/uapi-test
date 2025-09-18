@@ -259,7 +259,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         tests.push(test!(channel_submit_invalid_ioctl));
         tests.push(test!(channel_submit_increment_syncpoint_twice));
-        tests.push(test!(channel_submit_wait));
+        tests.push(test!(channel_submit_wait_middle));
+        tests.push(test!(channel_submit_wait_pre));
 
         if soc.chip_id() == 0x18
             || soc.chip_id() == 0x19

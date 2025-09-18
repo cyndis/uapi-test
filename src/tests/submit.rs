@@ -264,7 +264,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     })
 }
 
-pub fn channel_submit_wait(main: &Main) -> Result<()> {
+pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
     let value = main.drm.read_syncpoint(syncpt_id)?;
@@ -303,6 +303,56 @@ pub fn channel_submit_wait(main: &Main) -> Result<()> {
             ctx.args.syncpt.value - 1,
             Duration::from_millis(1000),
         )?;
+        check!(
+            main.drm
+                .wait_syncpoint(
+                    ctx.syncpt_id,
+                    ctx.args.syncpt.value,
+                    Duration::from_millis(100)
+                )
+                .is_err(),
+            "expected error"
+        );
+
+        syncpt.increment(1)?;
+
+        main.drm.wait_syncpoint(
+            ctx.syncpt_id,
+            ctx.args.syncpt.value,
+            Duration::from_millis(1000),
+        )?;
+
+        Ok(())
+    })
+}
+
+pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
+    let syncpt = main.drm.allocate_syncpoint()?;
+    let syncpt_id = syncpt.id();
+    let value = main.drm.read_syncpoint(syncpt_id)?;
+
+    submit_test(main, main.engine_class, |mut ctx| {
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        incr.id = ctx.syncpt.id();
+        incr.increments = 1;
+        ctx.incr.push(incr);
+
+        ctx.gather_data
+            .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
+
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
+        cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
+        cmd.__bindgen_anon_1.wait_syncpt.value = value.wrapping_add(1);
+        ctx.cmd.push(cmd);
+
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
+        cmd.__bindgen_anon_1.gather_uptr.words = 2;
+        ctx.cmd.push(cmd);
+
+        ctx.submit(main)?;
+
         check!(
             main.drm
                 .wait_syncpoint(
