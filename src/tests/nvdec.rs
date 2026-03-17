@@ -142,25 +142,15 @@ pub fn nvdec_mpeg2(main: &Main) -> Result<()> {
         const EXECUTE: u32 = 0x300;
         const AWAKEN_ENABLE: u32 = 1 << 8;
 
-        ctx.push(&[0x1_010_0002, SET_APPLICATION_ID >> 2, APPLICATION_ID_MPEG12]);
-        ctx.push(&[
-            0x1_010_0002,
-            SET_CONTROL_PARAMS >> 2,
-            CODEC_TYPE_MPEG2 | GPTIMER_ON,
-        ]);
-        ctx.push(&[0x1_010_0002, SET_DRV_PIC_SETUP_OFFSET >> 2]);
-        ctx.push_buf(&cfg_m);
-        ctx.push(&[0x1_010_0002, SET_IN_BUF_BASE_OFFSET >> 2]);
-        ctx.push_buf(&slicedata_m);
-        ctx.push(&[0x1_010_0002, SET_SLICE_OFFSETS_BUF_OFFSET >> 2]);
-        ctx.push_buf(&sliceoffset_m);
-        ctx.push(&[0x1_010_0002, SET_PICTURE_LUMA_OFFSET0 >> 2]);
-        ctx.push_buf_offset(&output_m, 0);
-        ctx.push(&[0x1_010_0002, SET_PICTURE_CHROMA_OFFSET0 >> 2]);
-        ctx.push_buf_offset(&output_m, 16 * 16);
-        ctx.push(&[0x1_010_0002, 0x424>>2]);
-        ctx.push_buf(&status_m);
-        ctx.push(&[0x1_010_0002, EXECUTE >> 2, AWAKEN_ENABLE]);
+        ctx.push_method(SET_APPLICATION_ID, APPLICATION_ID_MPEG12);
+        ctx.push_method(SET_CONTROL_PARAMS, CODEC_TYPE_MPEG2 | GPTIMER_ON);
+        ctx.push_method_buf(SET_DRV_PIC_SETUP_OFFSET, &cfg_m);
+        ctx.push_method_buf(SET_IN_BUF_BASE_OFFSET, &slicedata_m);
+        ctx.push_method_buf(SET_SLICE_OFFSETS_BUF_OFFSET, &sliceoffset_m);
+        ctx.push_method_buf_offset(SET_PICTURE_LUMA_OFFSET0, &output_m, 0);
+        ctx.push_method_buf_offset(SET_PICTURE_CHROMA_OFFSET0, &output_m, 16 * 16);
+        ctx.push_method_buf(0x424, &status_m);
+        ctx.push_method(EXECUTE, AWAKEN_ENABLE);
         ctx.push_syncpt_incr(1);
 
         ctx.submit(main)?;

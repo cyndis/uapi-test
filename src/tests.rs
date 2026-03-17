@@ -110,11 +110,36 @@ impl SubmitTestCtx<'_> {
         self.push(&[0xdead0000]);
     }
 
-    fn push_syncpt_incr(&mut self, condition: u32) {
+    fn set_increments(&mut self, id: u32, count: u32) {
+        for incr in &mut self.incr {
+            if incr.id == id {
+                incr.increments = count;
+                return;
+            }
+        }
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
+        incr.id = id;
+        incr.increments = count;
+        self.incr.push(incr);
+    }
+
+    fn push_wait_syncpt(&mut self, id: u32, value: u32) {
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
+        cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
+        cmd.data.wait_syncpt.id = id;
+        cmd.data.wait_syncpt.value = value;
+        self.cmd.push(cmd);
+    }
+
+    fn push_incr_syncpt(&mut self, id: u32, condition: u32) {
         self.push(&[
             0x1_000_0001,
-            self.syncpt_id | (condition << self.main.soc.condition_shift()),
+            id | (condition << self.main.soc.condition_shift()),
         ]);
+    }
+
+    fn push_syncpt_incr(&mut self, condition: u32) {
+        self.push_incr_syncpt(self.syncpt_id, condition);
 
         for incr in &mut self.incr {
             if incr.id == self.syncpt_id {
@@ -127,6 +152,20 @@ impl SubmitTestCtx<'_> {
         incr.id = self.syncpt_id;
         incr.increments = 1;
         self.incr.push(incr);
+    }
+
+    fn push_method(&mut self, reg: u32, value: u32) {
+        self.push(&[0x1_010_0002, reg >> 2, value]);
+    }
+
+    fn push_method_buf(&mut self, reg: u32, mapping: &Mapping) {
+        self.push(&[0x1_010_0002, reg >> 2]);
+        self.push_buf(mapping);
+    }
+
+    fn push_method_buf_offset(&mut self, reg: u32, mapping: &Mapping, offset: usize) {
+        self.push(&[0x1_010_0002, reg >> 2]);
+        self.push_buf_offset(mapping, offset);
     }
 }
 
