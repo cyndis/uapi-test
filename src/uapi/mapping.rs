@@ -25,6 +25,7 @@
 use super::Drm;
 use crate::tegra_drm::*;
 use crate::IocResult;
+use bytemuck::Zeroable;
 
 pub struct Mapping<'a> {
     pub(super) drm: &'a Drm,
@@ -48,7 +49,7 @@ impl Mapping<'_> {
         let r = self.drm.channel_unmap_raw(drm_tegra_channel_unmap {
             context: self.context,
             mapping: self.id,
-            ..unsafe { std::mem::zeroed() }
+            ..Zeroable::zeroed()
         });
         self.id = 0;
         r.map(|_| ())
@@ -63,7 +64,7 @@ impl Drop for Mapping<'_> {
         let _ = self.drm.channel_unmap_raw(drm_tegra_channel_unmap {
             context: self.context,
             mapping: self.id,
-            ..unsafe { std::mem::zeroed() }
+            ..Zeroable::zeroed()
         });
     }
 }

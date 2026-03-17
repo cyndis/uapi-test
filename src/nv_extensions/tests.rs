@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use bytemuck::Zeroable;
 use crate::Main;
 
 use super::host1x_fence::{Host1xFenceInterface, sys};
@@ -9,15 +10,15 @@ pub fn create_extract_fence_roundtrip(_main: &Main) -> Result<()> {
     let create_fence = intf.create_fence_raw(sys::host1x_create_fence {
         id: 2,
         threshold: 3,
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_FENCE failed")?;
 
-    let mut fence: sys::host1x_fence_extract_fence = unsafe { std::mem::zeroed() };
+    let mut fence: sys::host1x_fence_extract_fence = Zeroable::zeroed();
     intf.fence_extract_raw(sys::host1x_fence_extract {
         fence_fd: create_fence.fence_fd,
         num_fences: 1,
         fences_ptr: &mut fence as *const _ as u64,
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_FENCE_EXTRACT failed")?;
 
     check_eq!(fence.id, 2, "expected 2 but got {left}");
@@ -35,7 +36,7 @@ pub fn created_fence_wait(main: &Main) -> Result<()> {
     let create_fence = intf.create_fence_raw(sys::host1x_create_fence {
         id: syncpoint.id(),
         threshold: value.wrapping_add(1),
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_FENCE failed")?;
 
     let mut pollfd = libc::pollfd {
@@ -59,7 +60,7 @@ pub fn create_destroy_pollfd(main: &Main) -> Result<()> {
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
 
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
 
     unsafe { libc::close(create_pollfd.fd) };
@@ -74,7 +75,7 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpoint.id()).context("Failed to read syncpoint value")?;
 
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
 
     let mut poll_entry = libc::pollfd {
@@ -90,7 +91,7 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
         fd: create_pollfd.fd,
         id: syncpoint.id(),
         threshold: value.wrapping_add(1),
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_TRIGGER_POLLFD failed")?;
 
     let err = unsafe { libc::poll(&mut poll_entry as _, 1, 10) };
@@ -114,7 +115,7 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpoint.id()).context("Failed to read syncpoint value")?;
 
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
 
     std::thread::scope(|s| {
@@ -137,7 +138,7 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
             fd: create_pollfd.fd,
             id: id,
             threshold: value.wrapping_add(1),
-            ..unsafe { std::mem::zeroed() }
+            ..Zeroable::zeroed()
         }).context("HOST1X_TRIGGER_POLLFD failed")?;
 
         syncpoint.increment(1).context("failed to increment syncpoint")?;
@@ -159,7 +160,7 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpoint.id()).context("Failed to read syncpoint value")?;
 
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
 
     let mut poll_entry = libc::pollfd {
@@ -174,7 +175,7 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
         fd: create_pollfd.fd,
         id: syncpoint.id(),
         threshold: value,
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_TRIGGER_POLLFD failed")?;
 
     let err = unsafe { libc::poll(&mut poll_entry as _, 1, 10) };
@@ -192,21 +193,21 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpoint.id()).context("Failed to read syncpoint value")?;
 
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
         fd: create_pollfd.fd,
         id: syncpoint.id(),
         threshold: value.wrapping_add(1),
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_TRIGGER_POLLFD failed")?;
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
         fd: create_pollfd.fd,
         id: syncpoint.id(),
         threshold: value.wrapping_add(2),
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("second HOST1X_TRIGGER_POLLFD failed")?;
 
     syncpoint.increment(1).context("Failed to increment syncpoint")?;
@@ -224,7 +225,7 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
         fd: create_pollfd.fd,
         id: syncpoint.id(),
         threshold: value.wrapping_add(2),
-        ..unsafe { std::mem::zeroed() }
+        ..Zeroable::zeroed()
     }).context("HOST1X_TRIGGER_POLLFD failed during retrigger")?;
 
     syncpoint.increment(1).context("Failed to increment syncpoint")?;

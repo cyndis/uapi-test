@@ -34,16 +34,3 @@ pub use gem::Gem;
 pub use mapping::Mapping;
 pub use syncpoint::Syncpoint;
 
-#[cfg(target_env = "musl")]
-pub(crate) unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
-    /*
-     * We want to pass an unsigned int in through an int parameter,
-     * so need to transmute for a bit-exact copy..
-     */
-    libc::ioctl(fd, std::mem::transmute(ioc as u32), data)
-}
-#[cfg(not(target_env = "musl"))]
-pub(crate) unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
-    libc::ioctl(fd, ioc, data)
-}
-

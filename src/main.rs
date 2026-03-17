@@ -83,39 +83,19 @@ mod nv_extensions;
 use soc::Soc;
 use uapi::Drm;
 
+pub use nix::errno::Errno;
+
 pub type EResult<T> = anyhow::Result<T>;
 pub type IocResult<T> = Result<T, Errno>;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Errno(i32);
-
-impl Errno {
-    pub fn get() -> Errno {
-        Errno(errno::errno().0)
-    }
-}
-
-impl std::fmt::Display for Errno {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "<Errno {} '{}'>",
-            self.0,
-            errno::Errno(self.0).to_string()
-        )
-    }
-}
-
-impl std::error::Error for Errno {}
-
-pub const EINVAL: Errno = Errno(libc::EINVAL);
-pub const EBUSY: Errno = Errno(libc::EBUSY);
-pub const EINTR: Errno = Errno(libc::EINTR);
-pub const ENODEV: Errno = Errno(libc::ENODEV);
-pub const ENOMEM: Errno = Errno(libc::ENOMEM);
-pub const ENOSPC: Errno = Errno(libc::ENOSPC);
-pub const EFAULT: Errno = Errno(libc::EFAULT);
-pub const EPERM: Errno = Errno(libc::EPERM);
+pub const EINVAL: Errno = Errno::EINVAL;
+pub const EBUSY: Errno = Errno::EBUSY;
+pub const EINTR: Errno = Errno::EINTR;
+pub const ENODEV: Errno = Errno::ENODEV;
+pub const ENOMEM: Errno = Errno::ENOMEM;
+pub const ENOSPC: Errno = Errno::ENOSPC;
+pub const EFAULT: Errno = Errno::EFAULT;
+pub const EPERM: Errno = Errno::EPERM;
 
 pub struct Main {
     soc: Soc,

@@ -29,6 +29,7 @@ use crate::{
 };
 
 use anyhow::Result;
+use bytemuck::Zeroable;
 
 pub mod channels;
 pub mod gem;
@@ -88,7 +89,7 @@ impl SubmitTestCtx<'_> {
             }
         }
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = words.len() as u32;
         self.cmd.push(cmd);
@@ -99,7 +100,7 @@ impl SubmitTestCtx<'_> {
     }
 
     fn push_buf_offset(&mut self, mapping: &Mapping, offset: usize) {
-        let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
+        let mut buf: tegra_drm::drm_tegra_submit_buf = Zeroable::zeroed();
         buf.mapping = mapping.id();
         buf.reloc.gather_offset_words = self.gather_data.len() as _;
         buf.reloc.target_offset = offset as _;
@@ -122,7 +123,7 @@ impl SubmitTestCtx<'_> {
             }
         }
 
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = self.syncpt_id;
         incr.increments = 1;
         self.incr.push(incr);
@@ -138,7 +139,7 @@ fn submit_test<T>(
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
 
-    let mut args: tegra_drm::drm_tegra_channel_submit = unsafe { std::mem::zeroed() };
+    let mut args: tegra_drm::drm_tegra_channel_submit = Zeroable::zeroed();
     let incr = Vec::new();
     let cmd = Vec::new();
     let buf = Vec::new();

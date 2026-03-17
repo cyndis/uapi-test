@@ -25,6 +25,7 @@
 use super::Drm;
 use crate::tegra_drm::*;
 use crate::IocResult;
+use bytemuck::Zeroable;
 
 pub struct Syncpoint<'a> {
     pub(super) drm: &'a Drm,
@@ -52,7 +53,7 @@ impl Drop for Syncpoint<'_> {
         }
         let _ = self.drm.free_syncpoint_raw(drm_tegra_syncpoint_free {
             id: self.id,
-            ..unsafe { std::mem::zeroed() }
+            ..Zeroable::zeroed()
         });
     }
 }

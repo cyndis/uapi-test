@@ -23,7 +23,6 @@
  */
 
 use anyhow::Result;
-use std::convert::TryInto;
 use std::time::Duration;
 
 use crate::{
@@ -31,6 +30,7 @@ use crate::{
     tests::{submit_test, SubmitTestCtx},
     Errno, Main, EFAULT, EINVAL, EPERM,
 };
+use bytemuck::Zeroable;
 
 pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     fn submit(main: &Main, f: impl FnOnce(&mut SubmitTestCtx)) -> Result<Option<Errno>> {
@@ -264,7 +264,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         /* First, submit failing job */
 
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = ctx.syncpt.id();
         incr.increments = 3;
         ctx.incr.push(incr);
@@ -272,7 +272,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = ctx.gather_data.len() as u32;
         ctx.cmd.push(cmd);
@@ -315,7 +315,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         /* Ensure channel is again usable (with a different syncpoint) */
 
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = ctx.syncpt.id();
         incr.increments = 1;
         ctx.incr.push(incr);
@@ -323,7 +323,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = ctx.gather_data.len() as u32;
         ctx.cmd.push(cmd);
@@ -343,7 +343,7 @@ pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpt_id)?;
 
     submit_test(main, main.engine_class, |mut ctx| {
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = ctx.syncpt.id();
         incr.increments = 2;
         ctx.incr.push(incr);
@@ -353,18 +353,18 @@ pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
         cmd.data.wait_syncpt.id = syncpt_id;
         cmd.data.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
@@ -405,7 +405,7 @@ pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
     let value = main.drm.read_syncpoint(syncpt_id)?;
 
     submit_test(main, main.engine_class, |mut ctx| {
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = ctx.syncpt.id();
         incr.increments = 1;
         ctx.incr.push(incr);
@@ -413,13 +413,13 @@ pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
         cmd.data.wait_syncpt.id = syncpt_id;
         cmd.data.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
@@ -480,7 +480,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
             .drm
             .channel_map(&ctx.channel, &filt_gem, 0x0, 0x3000, false)?;
 
-        let mut incr: tegra_drm::drm_tegra_submit_syncpt = unsafe { std::mem::zeroed() };
+        let mut incr: tegra_drm::drm_tegra_submit_syncpt = Zeroable::zeroed();
         incr.id = ctx.syncpt.id();
         incr.increments = 2;
         ctx.incr.push(incr);
@@ -488,12 +488,12 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
         cmd.data.wait_syncpt.id = syncpt_id;
         cmd.data.wait_syncpt.value = value.wrapping_add(1);
@@ -508,7 +508,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_010_0002, 0x708 >> 2, 0x0]);
 
-        let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
+        let mut buf: tegra_drm::drm_tegra_submit_buf = Zeroable::zeroed();
         buf.mapping = cfg_m.id();
         buf.reloc.gather_offset_words = (ctx.gather_data.len() - 1) as _;
         buf.reloc.target_offset = 0;
@@ -518,7 +518,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_010_0002, 0x720 >> 2, 0x0]);
 
-        let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
+        let mut buf: tegra_drm::drm_tegra_submit_buf = Zeroable::zeroed();
         buf.mapping = surf_m.id();
         buf.reloc.gather_offset_words = (ctx.gather_data.len() - 1) as _;
         buf.reloc.target_offset = 0;
@@ -528,7 +528,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_010_0002, 0x70c >> 2, 0x0]);
 
-        let mut buf: tegra_drm::drm_tegra_submit_buf = unsafe { std::mem::zeroed() };
+        let mut buf: tegra_drm::drm_tegra_submit_buf = Zeroable::zeroed();
         buf.mapping = filt_m.id();
         buf.reloc.gather_offset_words = (ctx.gather_data.len() - 1) as _;
         buf.reloc.target_offset = 0;
@@ -540,7 +540,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         ctx.gather_data
             .extend_from_slice(&[0x1_000_0001, ctx.syncpt_id | (1 << 10)]);
 
-        let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
+        let mut cmd: tegra_drm::drm_tegra_submit_cmd = Zeroable::zeroed();
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
         cmd.data.gather_uptr.words = ctx.gather_data.len() as u32 - 2;
         ctx.cmd.push(cmd);

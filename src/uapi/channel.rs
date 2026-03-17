@@ -24,6 +24,7 @@
 
 use super::Drm;
 use crate::tegra_drm::*;
+use bytemuck::Zeroable;
 
 pub struct Channel<'a> {
     pub(super) drm: &'a Drm,
@@ -45,7 +46,7 @@ impl Drop for Channel<'_> {
     fn drop(&mut self) {
         let _ = self.drm.close_channel_raw(drm_tegra_channel_close {
             context: self.ctx,
-            ..unsafe { std::mem::zeroed() }
+            ..Zeroable::zeroed()
         });
     }
 }

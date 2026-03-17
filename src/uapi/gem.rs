@@ -24,6 +24,7 @@
 
 use super::Drm;
 use crate::tegra_drm::*;
+use bytemuck::Zeroable;
 
 pub struct Gem<'a> {
     pub(super) drm: &'a Drm,
@@ -36,34 +37,30 @@ impl Gem<'_> {
     }
 
     pub fn map(&self, length: usize) -> anyhow::Result<memmap::MmapMut> {
-        unsafe {
-            let mut args: drm_tegra_gem_mmap = std::mem::zeroed();
+        let mut args = drm_tegra_gem_mmap::zeroed();
+        args.handle = self.handle;
 
-            args.handle = self.handle;
+        let args = self.drm.gem_mmap_raw(args)?;
 
-            let args = self.drm.gem_mmap_raw(args)?;
-
-            let mmap = memmap::MmapOptions::new()
+        let mmap = unsafe {
+            memmap::MmapOptions::new()
                 .offset(args.offset)
                 .len(length)
-                .map_mut(&self.drm.fd)?;
+                .map_mut(&self.drm.fd)?
+        };
 
-            Ok(mmap)
-        }
+        Ok(mmap)
     }
 
     #[allow(unused)]
     pub fn export(&self) -> anyhow::Result<i32> {
-        unsafe {
-            let mut args: drm_prime_handle = std::mem::zeroed();
+        let mut args = drm_prime_handle::zeroed();
+        args.handle = self.handle;
+        args.flags = 2;
 
-            args.handle = self.handle;
-            args.flags = 2;
+        let args = self.drm.prime_handle_to_fd(args)?;
 
-            let args = self.drm.prime_handle_to_fd(args)?;
-
-            Ok(args.fd)
-        }
+        Ok(args.fd)
     }
 }
 
