@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use bytemuck::Zeroable;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
 use crate::Main;
 
 use super::host1x_fence::{Host1xFenceInterface, sys};
@@ -12,10 +14,11 @@ pub fn create_extract_fence_roundtrip(_main: &Main) -> Result<()> {
         threshold: 3,
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_FENCE failed")?;
+    let fence_fd = unsafe { OwnedFd::from_raw_fd(create_fence.fence_fd) };
 
     let mut fence: sys::host1x_fence_extract_fence = Zeroable::zeroed();
     intf.fence_extract_raw(sys::host1x_fence_extract {
-        fence_fd: create_fence.fence_fd,
+        fence_fd: fence_fd.as_raw_fd(),
         num_fences: 1,
         fences_ptr: &mut fence as *const _ as u64,
         ..Zeroable::zeroed()
@@ -38,9 +41,10 @@ pub fn created_fence_wait(main: &Main) -> Result<()> {
         threshold: value.wrapping_add(1),
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_FENCE failed")?;
+    let fence_fd = unsafe { OwnedFd::from_raw_fd(create_fence.fence_fd) };
 
     let mut pollfd = libc::pollfd {
-        fd: create_fence.fence_fd,
+        fd: fence_fd.as_raw_fd(),
         events: libc::POLLIN,
         revents: 0,
     };
@@ -62,8 +66,7 @@ pub fn create_destroy_pollfd(main: &Main) -> Result<()> {
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
-
-    unsafe { libc::close(create_pollfd.fd) };
+    let _pollfd = unsafe { OwnedFd::from_raw_fd(create_pollfd.fd) };
 
     Ok(())
 }
@@ -77,9 +80,10 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
+    let pollfd = unsafe { OwnedFd::from_raw_fd(create_pollfd.fd) };
 
     let mut poll_entry = libc::pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         events: libc::POLLIN,
         revents: 0,
     };
@@ -88,7 +92,7 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
     check_eq!(err, 0, "expected 0 completed polls but got {left}");
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         id: syncpoint.id(),
         threshold: value.wrapping_add(1),
         ..Zeroable::zeroed()
@@ -101,8 +105,6 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
 
     let err = unsafe { libc::poll(&mut poll_entry as _, 1, 10) };
     check_eq!(err, 1, "expected 1 completed polls but got {left}");
-
-    unsafe { libc::close(create_pollfd.fd) };
 
     Ok(())
 }
@@ -117,15 +119,16 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
+    let pollfd = unsafe { OwnedFd::from_raw_fd(create_pollfd.fd) };
 
     std::thread::scope(|s| {
         let handle = s.spawn(|| {
             let mut poll_entry = libc::pollfd {
-                fd: create_pollfd.fd,
+                fd: pollfd.as_raw_fd(),
                 events: libc::POLLIN,
                 revents: 0,
             };
-        
+
             let err = unsafe { libc::poll(&mut poll_entry as _, 1, 100) };
             check_eq!(err, 1, "expected 1 completed polls but got {left}");
 
@@ -135,7 +138,7 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
         std::thread::sleep(std::time::Duration::from_millis(10));
 
         intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-            fd: create_pollfd.fd,
+            fd: pollfd.as_raw_fd(),
             id: id,
             threshold: value.wrapping_add(1),
             ..Zeroable::zeroed()
@@ -147,8 +150,6 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
 
         Ok::<(), anyhow::Error>(())
     })?;
-
-    unsafe { libc::close(create_pollfd.fd) };
 
     Ok(())
 }
@@ -162,9 +163,10 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
+    let pollfd = unsafe { OwnedFd::from_raw_fd(create_pollfd.fd) };
 
     let mut poll_entry = libc::pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         events: libc::POLLIN,
         revents: 0,
     };
@@ -172,7 +174,7 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
     // Variant A: Threshold passed before trigger
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         id: syncpoint.id(),
         threshold: value,
         ..Zeroable::zeroed()
@@ -180,8 +182,6 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
 
     let err = unsafe { libc::poll(&mut poll_entry as _, 1, 10) };
     check_eq!(err, 1, "expected 1 completed polls but got {left}");
-
-    unsafe { libc::close(create_pollfd.fd) };
 
     Ok(())
 }
@@ -195,16 +195,17 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
     let create_pollfd = intf.create_pollfd_raw(sys::host1x_create_pollfd {
         ..Zeroable::zeroed()
     }).context("HOST1X_CREATE_POLLFD failed")?;
+    let pollfd = unsafe { OwnedFd::from_raw_fd(create_pollfd.fd) };
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         id: syncpoint.id(),
         threshold: value.wrapping_add(1),
         ..Zeroable::zeroed()
     }).context("HOST1X_TRIGGER_POLLFD failed")?;
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         id: syncpoint.id(),
         threshold: value.wrapping_add(2),
         ..Zeroable::zeroed()
@@ -213,7 +214,7 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
     syncpoint.increment(1).context("Failed to increment syncpoint")?;
 
     let mut poll_entry = libc::pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         events: libc::POLLIN,
         revents: 0,
     };
@@ -222,7 +223,7 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
     check_eq!(err, 1, "expected 1 completed polls but got {left}");
 
     intf.trigger_pollfd_raw(sys::host1x_trigger_pollfd {
-        fd: create_pollfd.fd,
+        fd: pollfd.as_raw_fd(),
         id: syncpoint.id(),
         threshold: value.wrapping_add(2),
         ..Zeroable::zeroed()
@@ -232,8 +233,6 @@ pub fn retrigger_pollfd(main: &Main) -> Result<()> {
 
     let err = unsafe { libc::poll(&mut poll_entry as _, 1, 10) };
     check_eq!(err, 1, "expected 1 completed polls but got {left} during retrigger");
-
-    unsafe { libc::close(create_pollfd.fd) };
 
     Ok(())
 }

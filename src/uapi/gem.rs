@@ -25,6 +25,7 @@
 use super::Drm;
 use crate::tegra_drm::*;
 use bytemuck::Zeroable;
+use std::os::fd::{FromRawFd, OwnedFd};
 
 pub struct Gem<'a> {
     pub(super) drm: &'a Drm,
@@ -53,14 +54,14 @@ impl Gem<'_> {
     }
 
     #[allow(unused)]
-    pub fn export(&self) -> anyhow::Result<i32> {
+    pub fn export(&self) -> anyhow::Result<OwnedFd> {
         let mut args = drm_prime_handle::zeroed();
         args.handle = self.handle;
         args.flags = 2;
 
         let args = self.drm.prime_handle_to_fd(args)?;
 
-        Ok(args.fd)
+        Ok(unsafe { OwnedFd::from_raw_fd(args.fd) })
     }
 }
 
