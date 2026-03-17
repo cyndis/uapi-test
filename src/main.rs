@@ -150,20 +150,94 @@ struct Args {
     #[arg(short, long)]
     engine: Option<Engine>,
 
+    /// Disable colored output and spinner (automatic when not a terminal).
+    #[arg(long)]
+    plain: bool,
+
     /// Test filter. Only run the specified test.
     filter: Option<String>,
+}
+
+struct Output {
+    color: bool,
+}
+
+struct SpinnerHandle {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for SpinnerHandle {
+    fn drop(&mut self) {
+        use std::sync::atomic::Ordering;
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.thread.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Output {
+    fn new(plain: bool) -> Self {
+        let is_tty = unsafe { libc::isatty(libc::STDOUT_FILENO) } != 0;
+        Output { color: !plain && is_tty }
+    }
+
+    fn green(&self, text: &str) -> String {
+        if self.color { format!("\x1b[32m{text}\x1b[0m") } else { text.to_string() }
+    }
+
+    fn red(&self, text: &str) -> String {
+        if self.color { format!("\x1b[31m{text}\x1b[0m") } else { text.to_string() }
+    }
+
+    fn bold(&self, text: &str) -> String {
+        if self.color { format!("\x1b[1m{text}\x1b[0m") } else { text.to_string() }
+    }
+
+    fn start_spinner(&self, name: &str) -> Option<SpinnerHandle> {
+        if !self.color {
+            return None;
+        }
+
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stop_clone = stop.clone();
+        let name = name.to_string();
+
+        let thread = std::thread::spawn(move || {
+            use std::io::Write;
+            use std::sync::atomic::Ordering;
+
+            const FRAMES: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+            let mut i = 0;
+
+            while !stop_clone.load(Ordering::Relaxed) {
+                eprint!("\r{:<50} \x1b[33m{}\x1b[0m", name, FRAMES[i % FRAMES.len()]);
+                let _ = std::io::stderr().flush();
+                i += 1;
+                std::thread::sleep(std::time::Duration::from_millis(80));
+            }
+
+            // Clear spinner line
+            eprint!("\r{:55}\r", "");
+            let _ = std::io::stderr().flush();
+        });
+
+        Some(SpinnerHandle { stop, thread: Some(thread) })
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use clap::Parser;
     let args = Args::parse();
+    let out = Output::new(args.plain);
 
-    println!("Host1x UAPI test");
+    println!("{}", out.bold("Host1x UAPI test"));
 
     let soc = Soc::detect()?;
 
     println!("Detected SoC: {}", soc);
-    println!("---------------------------------------------------------");
+    println!("{}", "-".repeat(64));
 
     let drm = Drm::open()?;
 
@@ -256,9 +330,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    for (name, test) in tests {
-        use std::io::Write;
+    let total_start = std::time::Instant::now();
 
+    for (name, test) in tests {
         num_total += 1;
 
         if let Some(ref filter) = args.filter {
@@ -269,42 +343,67 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         num_run += 1;
 
-        print!("{:<50} ", name);
-        std::io::stdout().lock().flush().unwrap();
-        match (test)(&main) {
+        let spinner = out.start_spinner(name);
+        let start = std::time::Instant::now();
+        let result = (test)(&main);
+        let elapsed = start.elapsed();
+        drop(spinner);
+
+        match result {
             Ok(()) => {
-                println!("    OK");
+                println!(
+                    "{:<50} {} ({:.2}s)",
+                    name,
+                    out.green("OK"),
+                    elapsed.as_secs_f64()
+                );
                 num_passed += 1;
             }
             Err(e) => {
-                println!("Failed");
+                println!(
+                    "{:<50} {} ({:.2}s)",
+                    name,
+                    out.red("FAILED"),
+                    elapsed.as_secs_f64()
+                );
                 println!("  {:?}", e);
             }
         }
     }
 
-    println!("---------------------------------------------------------");
+    let total_elapsed = total_start.elapsed();
+
+    println!("{}", "-".repeat(64));
     println!(
-        "{} tests total. {} run, {} skipped",
+        "{} tests total. {} run, {} skipped ({:.2}s)",
         num_total,
         num_run,
-        num_total - num_run
+        num_total - num_run,
+        total_elapsed.as_secs_f64()
     );
-    println!("{} passed, {} failed", num_passed, num_run - num_passed);
+
+    let num_failed = num_run - num_passed;
+    let passed_str = format!("{} passed", num_passed);
+    let failed_str = format!("{} failed", num_failed);
+    println!(
+        "{}, {}",
+        out.green(&passed_str),
+        if num_failed > 0 { out.red(&failed_str) } else { out.green(&failed_str) }
+    );
 
     if let Some(kmemleak) = kmemleak {
         match kmemleak.finish()? {
             Some(report) => {
-                println!("Memory leak(s) found:");
+                println!("{}", out.red("Memory leak(s) found:"));
                 println!("{}", report);
             }
             None => {
-                println!("No memory leaks detected.");
+                println!("{}", out.green("No memory leaks detected."));
             }
         }
     }
 
-    if num_run != num_passed {
+    if num_failed > 0 {
         Err("Tests failed".to_string())?;
     }
 
