@@ -12,6 +12,7 @@ clap = { version = "4", features = ["derive"] }
 memmap2 = "0.9"
 bytemuck = { version = "1.25", features = ["derive"] }
 anyhow = "1"
+inventory = "0.3"
 
 [profile.release]
 debug = 2

@@ -4,8 +4,10 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
 use crate::Main;
 
+use crate::uapi_test;
 use super::host1x_fence::{Host1xFenceInterface, sys};
 
+uapi_test!("fence.create_extract_roundtrip", create_extract_fence_roundtrip);
 pub fn create_extract_fence_roundtrip(_main: &Main) -> Result<()> {
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
 
@@ -30,6 +32,7 @@ pub fn create_extract_fence_roundtrip(_main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("fence.created_wait", created_fence_wait);
 pub fn created_fence_wait(main: &Main) -> Result<()> {
     let syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
@@ -59,6 +62,7 @@ pub fn created_fence_wait(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("pollfd.create_destroy", create_destroy_pollfd);
 pub fn create_destroy_pollfd(main: &Main) -> Result<()> {
     let _syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
@@ -71,6 +75,7 @@ pub fn create_destroy_pollfd(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("pollfd.basic", basic_pollfd);
 pub fn basic_pollfd(main: &Main) -> Result<()> {
     let syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
@@ -109,6 +114,7 @@ pub fn basic_pollfd(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("pollfd.poll_during_trigger", poll_during_trigger_pollfd);
 pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
     let syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
@@ -154,6 +160,7 @@ pub fn poll_during_trigger_pollfd(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("pollfd.past_threshold", past_threshold_pollfd);
 pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
     let syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;
@@ -186,6 +193,7 @@ pub fn past_threshold_pollfd(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("pollfd.retrigger", retrigger_pollfd);
 pub fn retrigger_pollfd(main: &Main) -> Result<()> {
     let syncpoint = main.drm.allocate_syncpoint().context("Failed to allocate syncpoint")?;
     let intf = Host1xFenceInterface::open().context("Failed to open host1x-fence interface")?;

@@ -27,6 +27,8 @@ use anyhow::Result;
 use crate::{tegra_drm, Main, EINVAL, ENODEV};
 use bytemuck::Zeroable;
 
+
+uapi_test!("channel.open_invalid", open_channel_invalid_ioctl);
 pub fn open_channel_invalid_ioctl(main: &Main) -> Result<()> {
     let zero: tegra_drm::drm_tegra_channel_open = Zeroable::zeroed();
 
@@ -63,6 +65,7 @@ pub fn open_channel_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("channel.open_close", open_close_channel);
 pub fn open_close_channel(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let zero: tegra_drm::drm_tegra_channel_close = Zeroable::zeroed();
@@ -81,6 +84,7 @@ pub fn open_close_channel(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("channel.engine_metadata", engine_metadata);
 pub fn engine_metadata(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
 
@@ -93,6 +97,7 @@ pub fn engine_metadata(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("channel.map_invalid", channel_map_invalid_ioctl);
 pub fn channel_map_invalid_ioctl(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
 
@@ -136,6 +141,7 @@ pub fn channel_map_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("channel.map_unmap", channel_map_unmap);
 pub fn channel_map_unmap(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let gem = main.drm.gem_create(0x1000)?;
@@ -159,6 +165,7 @@ pub fn channel_map_unmap(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("channel.map_gem_close", channel_map_gem_close);
 pub fn channel_map_gem_close(main: &Main) -> Result<()> {
     let channel = main.drm.open_channel(main.engine_class)?;
     let gem = main.drm.gem_create(0x1000)?;

@@ -94,6 +94,7 @@ fn read_u32_le(buf: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(buf[offset..offset + 4].try_into().unwrap())
 }
 
+uapi_test!("engine.nvdec", nvdec_mpeg2, soc = [0x21, 0x18, 0x19, 0x23]);
 pub fn nvdec_mpeg2(main: &Main) -> Result<()> {
     let cfg_gem = main.drm.gem_create(0x1000)?;
     let mut cfg_map = cfg_gem.map(0x1000)?;

@@ -104,6 +104,32 @@ pub struct Main {
     engine_class: u32,
 }
 
+pub struct Test {
+    pub name: &'static str,
+    pub func: fn(&Main) -> anyhow::Result<()>,
+    pub soc: &'static [u32],
+}
+
+inventory::collect!(Test);
+
+#[macro_export]
+macro_rules! uapi_test {
+    ($name:literal, $func:ident) => {
+        inventory::submit!(crate::Test {
+            name: $name,
+            func: $func,
+            soc: &[],
+        });
+    };
+    ($name:literal, $func:ident, soc = [$($soc:literal),* $(,)?]) => {
+        inventory::submit!(crate::Test {
+            name: $name,
+            func: $func,
+            soc: &[$($soc),*],
+        });
+    };
+}
+
 mod tests;
 
 #[derive(Copy, Clone)]
@@ -249,66 +275,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         engine_class: engine.class(),
     };
 
-    type Test = dyn Fn(&Main) -> anyhow::Result<()>;
-    let mut tests: Vec<(&str, Box<Test>)> = vec![];
+    let has_host1x_fence = std::path::Path::new("/dev/host1x-fence").exists();
 
-    macro_rules! test {
-        ($e:expr) => {
-            (stringify!($e), Box::new($e))
-        };
-    }
+    const SUITE_ORDER: &[&str] = &[
+        "syncpoint", "channel", "gem", "submit", "engine", "fence", "pollfd",
+    ];
 
-    {
-        use tests::{channels::*, gem::*, nvdec::*, submit::*, syncpoints::*, vic::*};
-        tests.push(test!(read_syncpoints));
-        tests.push(test!(incr_and_read_syncpoint));
-        tests.push(test!(allocate_syncpoint));
-        tests.push(test!(wait_syncpoint_multiple));
-        tests.push(test!(timeout_correctness));
-        tests.push(test!(wait_all_syncpoints));
-
-        tests.push(test!(open_channel_invalid_ioctl));
-        tests.push(test!(open_close_channel));
-        tests.push(test!(engine_metadata));
-        tests.push(test!(channel_map_invalid_ioctl));
-        tests.push(test!(channel_map_unmap));
-        tests.push(test!(channel_map_gem_close));
-
-        tests.push(test!(gem_mmap_invalid_ioctl));
-        tests.push(test!(gem_mmap));
-
-        tests.push(test!(channel_submit_invalid_ioctl));
-        tests.push(test!(channel_submit_increment_syncpoint_twice));
-        tests.push(test!(channel_submit_wait_middle));
-        tests.push(test!(channel_submit_wait_pre));
-
-        if soc.chip_id() == 0x18
-            || soc.chip_id() == 0x19
-            || soc.chip_id() == 0x23
-            || soc.chip_id() == 0x26
-        {
-            tests.push(test!(channel_buf_refcounting));
-            tests.push(test!(channel_submit_vic_clear));
+    let mut tests: Vec<&Test> = Vec::new();
+    for suite in SUITE_ORDER {
+        if !has_host1x_fence && (*suite == "fence" || *suite == "pollfd") {
+            continue;
         }
-
-        tests.push(test!(nvdec_mpeg2));
-
-        tests.push(test!(channel_submit_timeout));
-
-        /* NVIDIA internal tests */
-        use nv_extensions::tests as nv_extensions;
-        tests.push(test!(nv_extensions::create_extract_fence_roundtrip));
-        tests.push(test!(nv_extensions::created_fence_wait));
-        tests.push(test!(nv_extensions::create_destroy_pollfd));
-        tests.push(test!(nv_extensions::basic_pollfd));
-        tests.push(test!(nv_extensions::poll_during_trigger_pollfd));
-        tests.push(test!(nv_extensions::past_threshold_pollfd));
-        tests.push(test!(nv_extensions::retrigger_pollfd));
+        for test in inventory::iter::<Test> {
+            if test.name.starts_with(suite)
+                && test.name.as_bytes().get(suite.len()) == Some(&b'.')
+            {
+                tests.push(test);
+            }
+        }
     }
 
     if args.list {
-        for (name, _) in tests {
-            println!("{}", name);
+        for test in &tests {
+            println!("{}", test.name);
         }
 
         return Ok(());
@@ -332,20 +321,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let total_start = std::time::Instant::now();
 
-    for (name, test) in tests {
+    for test in &tests {
         num_total += 1;
 
         if let Some(ref filter) = args.filter {
-            if !name.contains(filter) {
+            if !test.name.contains(filter.as_str()) {
                 continue;
             }
         }
 
+        if !test.soc.is_empty() && !test.soc.contains(&soc.chip_id()) {
+            continue;
+        }
+
         num_run += 1;
 
-        let spinner = out.start_spinner(name);
+        let spinner = out.start_spinner(test.name);
         let start = std::time::Instant::now();
-        let result = (test)(&main);
+        let result = (test.func)(&main);
         let elapsed = start.elapsed();
         drop(spinner);
 
@@ -353,7 +346,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(()) => {
                 println!(
                     "{:<50} {} ({:.2}s)",
-                    name,
+                    test.name,
                     out.green("OK"),
                     elapsed.as_secs_f64()
                 );
@@ -362,7 +355,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => {
                 println!(
                     "{:<50} {} ({:.2}s)",
-                    name,
+                    test.name,
                     out.red("FAILED"),
                     elapsed.as_secs_f64()
                 );

@@ -25,6 +25,7 @@
 use crate::{Main, EBUSY, EINVAL};
 use anyhow::{Context, Result};
 
+uapi_test!("syncpoint.read", read_syncpoints);
 pub fn read_syncpoints(main: &Main) -> Result<()> {
     for i in 0..main.soc.num_syncpoints() {
         let value = main.drm.read_syncpoint(i);
@@ -41,6 +42,7 @@ pub fn read_syncpoints(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("syncpoint.incr_and_read", incr_and_read_syncpoint);
 pub fn incr_and_read_syncpoint(main: &Main) -> Result<()> {
     let sp = main.drm.allocate_syncpoint()?;
     let value = main.drm.read_syncpoint(sp.id())?;
@@ -65,6 +67,7 @@ pub fn incr_and_read_syncpoint(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("syncpoint.allocate", allocate_syncpoint);
 pub fn allocate_syncpoint(main: &Main) -> Result<()> {
     let mut sps = vec![];
     loop {
@@ -104,6 +107,7 @@ pub fn allocate_syncpoint(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("syncpoint.wait_all", wait_all_syncpoints);
 pub fn wait_all_syncpoints(main: &Main) -> Result<()> {
     let mut sps = vec![];
     loop {
@@ -154,6 +158,7 @@ pub fn wait_all_syncpoints(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("syncpoint.wait_multiple", wait_syncpoint_multiple);
 pub fn wait_syncpoint_multiple(main: &Main) -> Result<()> {
     let sp = main
         .drm
@@ -191,6 +196,7 @@ pub fn wait_syncpoint_multiple(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("syncpoint.timeout_correctness", timeout_correctness);
 pub fn timeout_correctness(main: &Main) -> Result<()> {
     let sp = main
         .drm

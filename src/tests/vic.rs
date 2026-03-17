@@ -31,6 +31,7 @@ use crate::{
     Main,
 };
 
+
 /// VIC 4.x config struct size (used in SET_CONTROL_PARAMS).
 const VIC4_CONFIG_STRUCT_SIZE: u32 = 2960;
 
@@ -159,6 +160,7 @@ fn check_clear_result(surf_gem: &crate::uapi::Gem) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("engine.vic", channel_submit_vic_clear, soc = [0x18, 0x19, 0x23, 0x26]);
 pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
     let is_vic5 = main.soc.is_vic5();
     let cfg_buf_size = cfg_buf_size(is_vic5);
@@ -195,6 +197,7 @@ pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
     check_clear_result(&surf_gem)
 }
 
+uapi_test!("submit.buf_refcounting", channel_buf_refcounting, soc = [0x18, 0x19, 0x23, 0x26]);
 pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
     let is_vic5 = main.soc.is_vic5();
     let cfg_buf_size = cfg_buf_size(is_vic5);

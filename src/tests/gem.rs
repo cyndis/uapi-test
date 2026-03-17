@@ -27,6 +27,7 @@ use anyhow::Result;
 use crate::{tegra_drm, Main, EINVAL};
 use bytemuck::Zeroable;
 
+uapi_test!("gem.mmap_invalid", gem_mmap_invalid_ioctl);
 pub fn gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     let zero: tegra_drm::drm_tegra_gem_mmap = Zeroable::zeroed();
 
@@ -53,6 +54,7 @@ pub fn gem_mmap_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("gem.mmap", gem_mmap);
 pub fn gem_mmap(main: &Main) -> Result<()> {
     let gem = main.drm.gem_create(0x1000)?;
 

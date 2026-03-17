@@ -30,6 +30,7 @@ use crate::{
     Errno, Main, EFAULT, EINVAL, EPERM,
 };
 
+uapi_test!("submit.invalid_ioctl", channel_submit_invalid_ioctl);
 pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     fn submit(main: &Main, f: impl FnOnce(&mut SubmitTestCtx)) -> Result<Option<Errno>> {
         submit_test(main, main.engine_class, |mut ctx| {
@@ -92,6 +93,7 @@ pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     Ok(())
 }
 
+uapi_test!("submit.incr_syncpoint_twice", channel_submit_increment_syncpoint_twice);
 pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         let base_value = main.drm.read_syncpoint(ctx.syncpt_id)?;
@@ -117,6 +119,7 @@ pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
     })
 }
 
+uapi_test!("submit.timeout", channel_submit_timeout);
 pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
         /* First, submit failing job */
@@ -174,6 +177,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
     })
 }
 
+uapi_test!("submit.wait_middle", channel_submit_wait_middle);
 pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
@@ -215,6 +219,7 @@ pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
     })
 }
 
+uapi_test!("submit.wait_pre", channel_submit_wait_pre);
 pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
