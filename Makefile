@@ -28,7 +28,4 @@ run-remote-32: build-32
 	@sshpass -p '$(REMOTE_PASSWORD)' scp $(SSH_OPTS) ./uapi-test-32 $(REMOTE_USER)@$(REMOTE):./
 	@sshpass -p '$(REMOTE_PASSWORD)' ssh $(SSH_OPTS) $(REMOTE_USER)@$(REMOTE) ./uapi-test-32 $(ARGS)
 
-generate-bindings:
-	env OUT_DIR=src/generated-bindings cargo run --manifest-path run-bindgen/Cargo.toml
-
-.PHONY: build-64 build-32 run-remote-64 run-remote-32 generate-bindings
+.PHONY: build-64 build-32 run-remote-64 run-remote-32
