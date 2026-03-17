@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        use tests::{channels::*, gem::*, nvdec::*, submit::*, syncpoints::*};
+        use tests::{channels::*, gem::*, nvdec::*, submit::*, syncpoints::*, vic::*};
         tests.push(test!(read_syncpoints));
         tests.push(test!(incr_and_read_syncpoint));
         tests.push(test!(allocate_syncpoint));

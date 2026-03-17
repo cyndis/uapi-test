@@ -36,6 +36,7 @@ pub mod gem;
 pub mod nvdec;
 pub mod submit;
 pub mod syncpoints;
+pub mod vic;
 
 struct SubmitTestCtx<'a> {
     main: &'a Main,
