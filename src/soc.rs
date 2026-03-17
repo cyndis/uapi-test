@@ -65,6 +65,11 @@ impl Soc {
     pub fn chip_id(self) -> u32 {
         self.0
     }
+
+    pub fn is_vic5(self) -> bool {
+        // Tegra264 has VIC 5.1 (CEB6) with a different config struct layout
+        self.0 == 0x26
+    }
 }
 
 impl std::fmt::Display for Soc {

@@ -118,29 +118,83 @@ pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
     })
 }
 
+/// Fill config buffer with VIC 4.x (B0B6/B1B6/C8B6) clear configuration.
+/// Config struct layout: PipeConfig(16B) + OutputConfig(16B) + OutputSurfaceConfig(16B) + ...
+fn fill_vic4_clear_config(cfg_map: &mut [u8]) {
+    let b: &mut vic::OutputConfig = bytemuck::from_bytes_mut(&mut cfg_map[16..32]);
+    b.set_TargetRectRight(31);
+    b.set_TargetRectBottom(31);
+    b.set_BackgroundAlpha(1023);
+    b.set_BackgroundR(0);
+    b.set_BackgroundG(1023);
+    b.set_BackgroundB(0);
+
+    let b: &mut vic::OutputSurfaceConfig = bytemuck::from_bytes_mut(&mut cfg_map[32..48]);
+    b.set_OutPixelFormat(32 /* ARGB8888 */);
+    b.set_OutSurfaceHeight(31);
+    b.set_OutSurfaceWidth(31);
+    b.set_OutLumaWidth(255);
+    b.set_OutLumaHeight(31);
+    b.set_OutChromaWidth(16383);
+    b.set_OutChromaHeight(16383);
+}
+
+/// Fill config buffer with VIC 5.x (CEB6) clear configuration.
+/// Config struct layout: OutConfig(448B) + ClearRect[8](64B) + SlotConfig[8](4096B) + ...
+/// OutConfig fields written directly at byte offsets matching nvceb6::OutConfig in vic_structs.h.
+fn fill_vic5_clear_config(cfg_map: &mut [u8]) {
+    // Dword 0 (offset 0): control bits
+    // Bit 7: OutGInputU16 = 1 (background colors in U0.16 format)
+    let control0: u32 = 1 << 7;
+    cfg_map[0..4].copy_from_slice(&control0.to_le_bytes());
+
+    // Dword 1 (offset 4): pixel format and surface config
+    // Bits 9:0: OutPixelFormat = 32 (T_A8R8G8B8)
+    let format: u32 = 32;
+    cfg_map[4..8].copy_from_slice(&format.to_le_bytes());
+
+    // Target rectangle (uint16_t fields at offsets 8-15)
+    cfg_map[8..10].copy_from_slice(&0u16.to_le_bytes());   // TargetRectLeft
+    cfg_map[10..12].copy_from_slice(&31u16.to_le_bytes());  // TargetRectRight
+    cfg_map[12..14].copy_from_slice(&0u16.to_le_bytes());   // TargetRectTop
+    cfg_map[14..16].copy_from_slice(&31u16.to_le_bytes());  // TargetRectBottom
+
+    // Output image dimensions, minus-1 encoded (uint16_t fields at offsets 16-27)
+    cfg_map[16..18].copy_from_slice(&31u16.to_le_bytes());    // OutImgWidth
+    cfg_map[18..20].copy_from_slice(&31u16.to_le_bytes());    // OutImgHeight
+    cfg_map[20..22].copy_from_slice(&255u16.to_le_bytes());   // OutLumaSfcWPad
+    cfg_map[22..24].copy_from_slice(&31u16.to_le_bytes());    // OutLumaSfcHPad
+    cfg_map[24..26].copy_from_slice(&16383u16.to_le_bytes()); // OutChromaSfcWPad
+    cfg_map[26..28].copy_from_slice(&16383u16.to_le_bytes()); // OutChromaSfcHPad
+
+    // Alpha fill mode (offset 28): AlphaFillMode = 0 (OPAQUE), all alpha set to 1.0
+    // Already zero from GEM allocation.
+
+    // Background colors in U0.16 format (uint16_t fields at offsets 32-39)
+    cfg_map[32..34].copy_from_slice(&0xFFFFu16.to_le_bytes()); // BackgroundA (1.0)
+    cfg_map[34..36].copy_from_slice(&0x0000u16.to_le_bytes()); // BackgroundR (0.0)
+    cfg_map[36..38].copy_from_slice(&0xFFFFu16.to_le_bytes()); // BackgroundG (1.0)
+    cfg_map[38..40].copy_from_slice(&0x0000u16.to_le_bytes()); // BackgroundB (0.0)
+}
+
+/// VIC 4.x config struct size (used in SET_CONTROL_PARAMS).
+const VIC4_CONFIG_STRUCT_SIZE: u32 = 2960;
+
+/// Config buffer size: VIC 5.x CompositorConfigStruct is ~5376 bytes,
+/// use 0x2000 (8192) for sufficient room.
+const VIC5_CONFIG_BUF_SIZE: u64 = 0x2000;
+
 pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
-    let cfg_gem = main.drm.gem_create(0x1000)?;
-    let mut cfg_map = cfg_gem.map(0x1000)?;
+    let is_vic5 = main.soc.is_vic5();
+    let cfg_buf_size: u64 = if is_vic5 { VIC5_CONFIG_BUF_SIZE } else { 0x1000 };
 
-    {
-        let b: &mut vic::OutputConfig = bytemuck::from_bytes_mut(&mut cfg_map[16..32]);
-        b.set_TargetRectRight(31);
-        b.set_TargetRectBottom(31);
-        b.set_BackgroundAlpha(1023);
-        b.set_BackgroundR(0);
-        b.set_BackgroundG(1023);
-        b.set_BackgroundB(0);
-    }
+    let cfg_gem = main.drm.gem_create(cfg_buf_size)?;
+    let mut cfg_map = cfg_gem.map(cfg_buf_size as usize)?;
 
-    {
-        let b: &mut vic::OutputSurfaceConfig = bytemuck::from_bytes_mut(&mut cfg_map[32..48]);
-        b.set_OutPixelFormat(32 /* ARGB8888 */);
-        b.set_OutSurfaceHeight(31);
-        b.set_OutSurfaceWidth(31);
-        b.set_OutLumaWidth(255);
-        b.set_OutLumaHeight(31);
-        b.set_OutChromaWidth(16383);
-        b.set_OutChromaHeight(16383);
+    if is_vic5 {
+        fill_vic5_clear_config(&mut cfg_map);
+    } else {
+        fill_vic4_clear_config(&mut cfg_map);
     }
 
     let surf_gem = main.drm.gem_create(32768)?;
@@ -149,7 +203,7 @@ pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
     submit_test(main, 0x5d, |mut ctx| {
         let cfg_m = main
             .drm
-            .channel_map(&ctx.channel, &cfg_gem, 0x0, 0x1000, false)?;
+            .channel_map(&ctx.channel, &cfg_gem, 0x0, cfg_buf_size, false)?;
         let surf_m = main
             .drm
             .channel_map(&ctx.channel, &surf_gem, 0x0, 32768, true)?;
@@ -157,8 +211,14 @@ pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
             .drm
             .channel_map(&ctx.channel, &filt_gem, 0x0, 0x3000, false)?;
 
-        ctx.push(&[0x1_010_0002, 0x200 >> 2, 1]);
-        ctx.push(&[0x1_010_0002, 0x704 >> 2, (2960 / 16) << 16]);
+        // SET_APPLICATION_ID: VIC 4.x = 1 (compose), VIC 5.x = 0
+        let app_id = if is_vic5 { 0 } else { 1 };
+        ctx.push(&[0x1_010_0002, 0x200 >> 2, app_id]);
+
+        // SET_CONTROL_PARAMS: VIC 4.x encodes config struct size, VIC 5.x = 0
+        let control_params = if is_vic5 { 0 } else { (VIC4_CONFIG_STRUCT_SIZE / 16) << 16 };
+        ctx.push(&[0x1_010_0002, 0x704 >> 2, control_params]);
+
         ctx.push(&[0x1_010_0002, 0x708 >> 2]);
         ctx.push_buf(&cfg_m);
         ctx.push(&[0x1_010_0002, 0x720 >> 2]);
@@ -377,32 +437,20 @@ pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
 }
 
 pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
+    let is_vic5 = main.soc.is_vic5();
+    let cfg_buf_size: u64 = if is_vic5 { VIC5_CONFIG_BUF_SIZE } else { 0x1000 };
+
     let syncpt = main.drm.allocate_syncpoint()?;
     let syncpt_id = syncpt.id();
     let value = main.drm.read_syncpoint(syncpt_id)?;
 
-    let cfg_gem = main.drm.gem_create(0x1000)?;
-    let mut cfg_map = cfg_gem.map(0x1000)?;
+    let cfg_gem = main.drm.gem_create(cfg_buf_size)?;
+    let mut cfg_map = cfg_gem.map(cfg_buf_size as usize)?;
 
-    {
-        let b: &mut vic::OutputConfig = bytemuck::from_bytes_mut(&mut cfg_map[16..32]);
-        b.set_TargetRectRight(31);
-        b.set_TargetRectBottom(31);
-        b.set_BackgroundAlpha(1023);
-        b.set_BackgroundR(0);
-        b.set_BackgroundG(1023);
-        b.set_BackgroundB(0);
-    }
-
-    {
-        let b: &mut vic::OutputSurfaceConfig = bytemuck::from_bytes_mut(&mut cfg_map[32..48]);
-        b.set_OutPixelFormat(32);
-        b.set_OutSurfaceHeight(31);
-        b.set_OutSurfaceWidth(31);
-        b.set_OutLumaWidth(255);
-        b.set_OutLumaHeight(31);
-        b.set_OutChromaWidth(16383);
-        b.set_OutChromaHeight(16383);
+    if is_vic5 {
+        fill_vic5_clear_config(&mut cfg_map);
+    } else {
+        fill_vic4_clear_config(&mut cfg_map);
     }
 
     let surf_gem = main.drm.gem_create(32768)?;
@@ -411,7 +459,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
     submit_test(main, 0x5d, |mut ctx| {
         let cfg_m = main
             .drm
-            .channel_map(&ctx.channel, &cfg_gem, 0x0, 0x1000, false)?;
+            .channel_map(&ctx.channel, &cfg_gem, 0x0, cfg_buf_size, false)?;
         let surf_m = main
             .drm
             .channel_map(&ctx.channel, &surf_gem, 0x0, 32768, true)?;
@@ -438,10 +486,12 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
         cmd.__bindgen_anon_1.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
+        let app_id = if is_vic5 { 0u32 } else { 1u32 };
+        let control_params = if is_vic5 { 0u32 } else { (VIC4_CONFIG_STRUCT_SIZE / 16) << 16 };
         ctx.gather_data
-            .extend_from_slice(&[0x1_010_0002, 0x200 >> 2, 1]);
+            .extend_from_slice(&[0x1_010_0002, 0x200 >> 2, app_id]);
         ctx.gather_data
-            .extend_from_slice(&[0x1_010_0002, 0x704 >> 2, (2960 / 16) << 16]);
+            .extend_from_slice(&[0x1_010_0002, 0x704 >> 2, control_params]);
         ctx.gather_data
             .extend_from_slice(&[0x1_010_0002, 0x708 >> 2, 0x0]);
 
