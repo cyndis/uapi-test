@@ -22,44 +22,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-pub mod tegra_drm {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(unused)]
-    #![allow(deref_nullptr)]
-
-    include!("generated-bindings/tegra_drm_bindings.rs");
-}
-
-pub mod vic {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(unused)]
-    #![allow(deref_nullptr)]
-
-    include!("generated-bindings/vic_bindings.rs");
-
-    unsafe impl bytemuck::Pod for OutputConfig {}
-    unsafe impl bytemuck::Zeroable for OutputConfig {}
-
-    unsafe impl bytemuck::Pod for OutputSurfaceConfig {}
-    unsafe impl bytemuck::Zeroable for OutputSurfaceConfig {}
-}
-
-pub mod nvdec {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(unused)]
-    #![allow(deref_nullptr)]
-
-    include!("generated-bindings/nvdec_bindings.rs");
-
-    unsafe impl bytemuck::Pod for nvdec_mpeg2_pic_s {}
-    unsafe impl bytemuck::Zeroable for nvdec_mpeg2_pic_s {}
-}
+pub mod tegra_drm;
 
 macro_rules! check {
     ($a:expr, $($msg:tt)+) => {

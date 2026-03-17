@@ -82,7 +82,7 @@ impl SubmitTestCtx<'_> {
         if let Some(cmd) = self.cmd.last_mut() {
             if cmd.type_ == tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR {
                 unsafe {
-                    cmd.__bindgen_anon_1.gather_uptr.words += words.len() as u32;
+                    cmd.data.gather_uptr.words += words.len() as u32;
                 }
                 return;
             }
@@ -90,7 +90,7 @@ impl SubmitTestCtx<'_> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = words.len() as u32;
+        cmd.data.gather_uptr.words = words.len() as u32;
         self.cmd.push(cmd);
     }
 

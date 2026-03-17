@@ -23,12 +23,13 @@
  */
 
 use anyhow::Result;
+use std::convert::TryInto;
 use std::time::Duration;
 
 use crate::{
     tegra_drm,
     tests::{submit_test, SubmitTestCtx},
-    vic, Errno, Main, EFAULT, EINVAL, EPERM,
+    Errno, Main, EFAULT, EINVAL, EPERM,
 };
 
 pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
@@ -74,7 +75,7 @@ pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
     );
 
     check_eq!(
-        submit(main, |c| c.cmd[0].__bindgen_anon_1.gather_uptr.words = 1000)?,
+        submit(main, |c| c.cmd[0].data.gather_uptr.words = 1000)?,
         Some(EINVAL),
         "expected EINVAL but got {left:?}"
     );
@@ -120,23 +121,35 @@ pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
 
 /// Fill config buffer with VIC 4.x (B0B6/B1B6/C8B6) clear configuration.
 /// Config struct layout: PipeConfig(16B) + OutputConfig(16B) + OutputSurfaceConfig(16B) + ...
+///
+/// OutputConfig is two packed u64 bitfield words (see engine-hdr/vic.h):
+///   Word 0: AlphaFillMode(3), AlphaFillSlot(3), BackgroundAlpha(10), BackgroundR(10),
+///           BackgroundG(10), BackgroundB(10), ...
+///   Word 1: TargetRectLeft(14), reserved(2), TargetRectRight(14), reserved(2),
+///           TargetRectTop(14), reserved(2), TargetRectBottom(14), reserved(2)
+///
+/// OutputSurfaceConfig is two packed u64 bitfield words:
+///   Word 0: OutPixelFormat(7), ..., OutSurfaceWidth(14), OutSurfaceHeight(14), ...
+///   Word 1: OutLumaWidth(14), OutLumaHeight(14), ..., OutChromaWidth(14), OutChromaHeight(14), ...
 fn fill_vic4_clear_config(cfg_map: &mut [u8]) {
-    let b: &mut vic::OutputConfig = bytemuck::from_bytes_mut(&mut cfg_map[16..32]);
-    b.set_TargetRectRight(31);
-    b.set_TargetRectBottom(31);
-    b.set_BackgroundAlpha(1023);
-    b.set_BackgroundR(0);
-    b.set_BackgroundG(1023);
-    b.set_BackgroundB(0);
+    // OutputConfig at offset 16
+    // Word 0: BackgroundAlpha=1023 (bits 6-15), BackgroundG=1023 (bits 26-35)
+    let word0: u64 = (1023 << 6) | (1023 << 26);
+    cfg_map[16..24].copy_from_slice(&word0.to_le_bytes());
 
-    let b: &mut vic::OutputSurfaceConfig = bytemuck::from_bytes_mut(&mut cfg_map[32..48]);
-    b.set_OutPixelFormat(32 /* ARGB8888 */);
-    b.set_OutSurfaceHeight(31);
-    b.set_OutSurfaceWidth(31);
-    b.set_OutLumaWidth(255);
-    b.set_OutLumaHeight(31);
-    b.set_OutChromaWidth(16383);
-    b.set_OutChromaHeight(16383);
+    // Word 1: TargetRectRight=31 (bits 80-93, i.e. offset 16 in word), TargetRectBottom=31 (bits 112-125, i.e. offset 48)
+    let word1: u64 = (31 << 16) | (31 << 48);
+    cfg_map[24..32].copy_from_slice(&word1.to_le_bytes());
+
+    // OutputSurfaceConfig at offset 32
+    // Word 0: OutPixelFormat=32 (bits 0-6), OutSurfaceWidth=31 (bits 32-45), OutSurfaceHeight=31 (bits 46-59)
+    let word0: u64 = 32 | (31 << 32) | (31 << 46);
+    cfg_map[32..40].copy_from_slice(&word0.to_le_bytes());
+
+    // Word 1: OutLumaWidth=255 (bits 0-13), OutLumaHeight=31 (bits 14-27),
+    //         OutChromaWidth=16383 (bits 32-45), OutChromaHeight=16383 (bits 46-59)
+    let word1: u64 = 255 | (31 << 14) | (16383 << 32) | (16383 << 46);
+    cfg_map[40..48].copy_from_slice(&word1.to_le_bytes());
 }
 
 /// Fill config buffer with VIC 5.x (CEB6) clear configuration.
@@ -237,9 +250,9 @@ pub fn channel_submit_vic_clear(main: &Main) -> Result<()> {
     })?;
 
     let surf_map = surf_gem.map(0x1000)?;
-    let pixels: &[u32] = bytemuck::cast_slice(&surf_map[0..0x1000]);
+    let pixel = u32::from_le_bytes(surf_map[0..4].try_into().unwrap());
     check_eq!(
-        pixels[0],
+        pixel,
         0xff00ff00,
         "Expected 0xff00ff00, got 0x{left:08x}"
     );
@@ -261,7 +274,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = ctx.gather_data.len() as u32;
+        cmd.data.gather_uptr.words = ctx.gather_data.len() as u32;
         ctx.cmd.push(cmd);
 
         ctx.submit(main)?;
@@ -312,7 +325,7 @@ pub fn channel_submit_timeout(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = ctx.gather_data.len() as u32;
+        cmd.data.gather_uptr.words = ctx.gather_data.len() as u32;
         ctx.cmd.push(cmd);
 
         ctx.submit(main)?;
@@ -342,18 +355,18 @@ pub fn channel_submit_wait_middle(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = 2;
+        cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
-        cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
-        cmd.__bindgen_anon_1.wait_syncpt.value = value.wrapping_add(1);
+        cmd.data.wait_syncpt.id = syncpt_id;
+        cmd.data.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = 2;
+        cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
         ctx.submit(main)?;
@@ -402,13 +415,13 @@ pub fn channel_submit_wait_pre(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
-        cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
-        cmd.__bindgen_anon_1.wait_syncpt.value = value.wrapping_add(1);
+        cmd.data.wait_syncpt.id = syncpt_id;
+        cmd.data.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = 2;
+        cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
         ctx.submit(main)?;
@@ -477,13 +490,13 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = 2;
+        cmd.data.gather_uptr.words = 2;
         ctx.cmd.push(cmd);
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_WAIT_SYNCPT;
-        cmd.__bindgen_anon_1.wait_syncpt.id = syncpt_id;
-        cmd.__bindgen_anon_1.wait_syncpt.value = value.wrapping_add(1);
+        cmd.data.wait_syncpt.id = syncpt_id;
+        cmd.data.wait_syncpt.value = value.wrapping_add(1);
         ctx.cmd.push(cmd);
 
         let app_id = if is_vic5 { 0u32 } else { 1u32 };
@@ -529,7 +542,7 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
 
         let mut cmd: tegra_drm::drm_tegra_submit_cmd = unsafe { std::mem::zeroed() };
         cmd.type_ = tegra_drm::DRM_TEGRA_SUBMIT_CMD_GATHER_UPTR;
-        cmd.__bindgen_anon_1.gather_uptr.words = ctx.gather_data.len() as u32 - 2;
+        cmd.data.gather_uptr.words = ctx.gather_data.len() as u32 - 2;
         ctx.cmd.push(cmd);
 
         ctx.submit(main)?;
@@ -558,9 +571,9 @@ pub fn channel_buf_refcounting(main: &Main) -> Result<()> {
     })?;
 
     let surf_map = surf_gem.map(0x1000)?;
-    let pixels: &[u32] = bytemuck::cast_slice(&surf_map[0..0x1000]);
+    let pixel = u32::from_le_bytes(surf_map[0..4].try_into().unwrap());
     check_eq!(
-        pixels[0],
+        pixel,
         0xff00ff00,
         "Expected 0xff00ff00, got 0x{left:08x}"
     );

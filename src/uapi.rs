@@ -46,3 +46,4 @@ pub(crate) unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
 pub(crate) unsafe fn ioctl<T>(fd: i32, ioc: u64, data: T) -> i32 {
     libc::ioctl(fd, ioc, data)
 }
+
