@@ -28,9 +28,17 @@ use crate::EResult;
 pub struct Soc(u32);
 impl Soc {
     pub fn detect() -> EResult<Soc> {
-        let soc = std::fs::read_to_string("/sys/devices/soc0/soc_id")?
-            .trim_end()
-            .parse::<u32>()?;
+        let soc_id = std::fs::read_to_string("/sys/devices/soc0/soc_id")?;
+        let soc_id = soc_id.trim_end();
+
+        // soc_id can be a plain decimal number or a JEP106 string like
+        // "jep106:036b:0264". In the latter case, parse the last field as hex
+        // and drop the last nibble to get the legacy chip id (e.g. 0x0264 >> 4 = 0x26).
+        let soc = if let Some(id_hex) = soc_id.rsplit(':').next().filter(|_| soc_id.contains(':')) {
+            u32::from_str_radix(id_hex, 16)? >> 4
+        } else {
+            soc_id.parse::<u32>()?
+        };
 
         Ok(Soc(soc))
     }
