@@ -36,14 +36,14 @@ impl Gem<'_> {
         self.handle
     }
 
-    pub fn map(&self, length: usize) -> anyhow::Result<memmap::MmapMut> {
+    pub fn map(&self, length: usize) -> anyhow::Result<memmap2::MmapMut> {
         let mut args = drm_tegra_gem_mmap::zeroed();
         args.handle = self.handle;
 
         let args = self.drm.gem_mmap_raw(args)?;
 
         let mmap = unsafe {
-            memmap::MmapOptions::new()
+            memmap2::MmapOptions::new()
                 .offset(args.offset)
                 .len(length)
                 .map_mut(&self.drm.fd)?

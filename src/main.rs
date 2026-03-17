@@ -139,25 +139,24 @@ impl std::str::FromStr for Engine {
     }
 }
 
-#[derive(structopt::StructOpt)]
-#[structopt(name = "uapi-test", about = "Host1x UAPI test")]
+#[derive(clap::Parser)]
+#[command(name = "uapi-test", about = "Host1x UAPI test")]
 struct Args {
     /// Only list the available tests.
-    #[structopt(short, long)]
+    #[arg(short, long)]
     list: bool,
 
     /// Engine to use for engine-independent tests. Defaults to 'vic'. Options: vic, nvdec, ofa, nvenc
-    #[structopt(short, long)]
+    #[arg(short, long)]
     engine: Option<Engine>,
 
     /// Test filter. Only run the specified test.
-    #[structopt(name = "FILTER")]
     filter: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use structopt::StructOpt;
-    let args = Args::from_args();
+    use clap::Parser;
+    let args = Args::parse();
 
     println!("Host1x UAPI test");
 
