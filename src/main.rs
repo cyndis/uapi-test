@@ -180,6 +180,10 @@ struct Args {
     #[arg(long)]
     plain: bool,
 
+    /// Comma-separated list of staged test names. These tests run but failures are ignored.
+    #[arg(short, long, value_delimiter = ',')]
+    staged: Vec<String>,
+
     /// Test filter. Only run the specified test.
     filter: Option<String>,
 }
@@ -215,6 +219,10 @@ impl Output {
 
     fn red(&self, text: &str) -> String {
         if self.color { format!("\x1b[31m{text}\x1b[0m") } else { text.to_string() }
+    }
+
+    fn yellow(&self, text: &str) -> String {
+        if self.color { format!("\x1b[33m{text}\x1b[0m") } else { text.to_string() }
     }
 
     fn bold(&self, text: &str) -> String {
@@ -306,6 +314,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut num_total = 0;
     let mut num_run = 0;
     let mut num_passed = 0;
+    let mut num_staged_failed = 0;
 
     let kmemleak = match kmemleak::Session::start() {
         Ok(session) => Some(session),
@@ -336,18 +345,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         num_run += 1;
 
+        let staged = args.staged.iter().any(|s| s == test.name);
+
         let spinner = out.start_spinner(test.name);
         let start = std::time::Instant::now();
         let result = (test.func)(&main);
         let elapsed = start.elapsed();
         drop(spinner);
 
+        let staged_suffix = if staged { " (staged)" } else { "" };
         match result {
             Ok(()) => {
                 println!(
                     "{:<50} {} ({:.2}s)",
                     test.name,
-                    out.green("OK"),
+                    out.green(&format!("OK{staged_suffix}")),
                     elapsed.as_secs_f64()
                 );
                 num_passed += 1;
@@ -356,10 +368,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "{:<50} {} ({:.2}s)",
                     test.name,
-                    out.red("FAILED"),
+                    if staged { out.yellow(&format!("FAILED{staged_suffix}")) } else { out.red("FAILED") },
                     elapsed.as_secs_f64()
                 );
                 println!("  {:?}", e);
+                if staged {
+                    num_staged_failed += 1;
+                }
             }
         }
     }
@@ -375,14 +390,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         total_elapsed.as_secs_f64()
     );
 
-    let num_failed = num_run - num_passed;
+    let num_failed = num_run - num_passed - num_staged_failed;
     let passed_str = format!("{} passed", num_passed);
     let failed_str = format!("{} failed", num_failed);
-    println!(
+    let staged_str = format!("{} failed (staged)", num_staged_failed);
+    let mut summary = format!(
         "{}, {}",
         out.green(&passed_str),
         if num_failed > 0 { out.red(&failed_str) } else { out.green(&failed_str) }
     );
+    if num_staged_failed > 0 {
+        summary += &format!(", {}", out.yellow(&staged_str));
+    }
+    println!("{}", summary);
 
     if let Some(kmemleak) = kmemleak {
         match kmemleak.finish()? {
