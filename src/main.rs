@@ -132,38 +132,7 @@ macro_rules! uapi_test {
 
 mod tests;
 
-#[derive(Copy, Clone)]
-enum Engine {
-    Vic,
-    Nvdec,
-    Ofa,
-    Nvenc,
-}
-
-impl Engine {
-    fn class(self) -> u32 {
-        match self {
-            Engine::Vic => 0x5d,
-            Engine::Nvdec => 0xf0,
-            Engine::Ofa => 0xf8,
-            Engine::Nvenc => 0x21,
-        }
-    }
-}
-
-impl std::str::FromStr for Engine {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "vic" => Engine::Vic,
-            "nvdec" => Engine::Nvdec,
-            "ofa" => Engine::Ofa,
-            "nvenc" => Engine::Nvenc,
-            _ => return Err("unsupported engine"),
-        })
-    }
-}
+use soc::Engine;
 
 #[derive(clap::Parser)]
 #[command(name = "uapi-test", about = "Host1x UAPI test")]
@@ -275,12 +244,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let drm = Drm::open()?;
 
-    let engine = args.engine.unwrap_or(Engine::Vic);
+    let engine_class = args.engine.unwrap_or(soc.default_engine()).class();
 
     let main = Main {
         soc,
         drm,
-        engine_class: engine.class(),
+        engine_class,
     };
 
     let has_host1x_fence = std::path::Path::new("/dev/host1x-fence").exists();

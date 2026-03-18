@@ -25,6 +25,45 @@
 use crate::EResult;
 
 #[derive(Copy, Clone)]
+pub enum Engine {
+    Gr2d,
+    Gr3d,
+    Vic,
+    Nvdec,
+    Ofa,
+    Nvenc,
+}
+
+impl Engine {
+    pub fn class(self) -> u32 {
+        match self {
+            Engine::Gr2d => 0x51,
+            Engine::Gr3d => 0x60,
+            Engine::Vic => 0x5d,
+            Engine::Nvdec => 0xf0,
+            Engine::Ofa => 0xf8,
+            Engine::Nvenc => 0x21,
+        }
+    }
+}
+
+impl std::str::FromStr for Engine {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "gr2d" => Engine::Gr2d,
+            "gr3d" => Engine::Gr3d,
+            "vic" => Engine::Vic,
+            "nvdec" => Engine::Nvdec,
+            "ofa" => Engine::Ofa,
+            "nvenc" => Engine::Nvenc,
+            _ => return Err("unsupported engine"),
+        })
+    }
+}
+
+#[derive(Copy, Clone)]
 pub struct Soc(u32);
 impl Soc {
     pub fn detect() -> EResult<Soc> {
@@ -64,6 +103,15 @@ impl Soc {
 
     pub fn chip_id(self) -> u32 {
         self.0
+    }
+
+    pub fn default_engine(self) -> Engine {
+        match self.0 {
+            // Pre-Tegra124: GR2D
+            0x20 | 0x30 | 0x35 => Engine::Gr2d,
+            // Tegra124+: VIC
+            _ => Engine::Vic,
+        }
     }
 
     pub fn is_vic5(self) -> bool {
