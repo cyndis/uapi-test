@@ -38,7 +38,7 @@ impl Soc {
     pub fn num_syncpoints(self) -> u32 {
         match self.0 {
             0x20 | 0x30 | 0x35 => 32,
-            0x40 | 0x13 => 192,
+            0x40 | 0x13 | 0x21 => 192,
             0x18 => 576,
             0x19 => 704,
             0x23 | 0x26 => 1024,
