@@ -22,7 +22,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::time::Duration;
 
 use crate::{
@@ -96,12 +96,13 @@ pub fn channel_submit_invalid_ioctl(main: &Main) -> Result<()> {
 uapi_test!("submit.incr_syncpoint_twice", channel_submit_increment_syncpoint_twice);
 pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
     submit_test(main, main.engine_class, |mut ctx| {
-        let base_value = main.drm.read_syncpoint(ctx.syncpt_id)?;
+        let base_value = main.drm.read_syncpoint(ctx.syncpt_id)
+            .context("failed to read initial syncpoint value")?;
 
         ctx.push_syncpt_incr(0);
         ctx.push_syncpt_incr(0);
 
-        ctx.submit(main)?;
+        ctx.submit(main).context("failed to submit job")?;
 
         /*
          * The kernel is allowed to insert extra increments at the beginning of the job,
@@ -109,11 +110,16 @@ pub fn channel_submit_increment_syncpoint_twice(main: &Main) -> Result<()> {
          */
         check!(
             ctx.args.syncpt.value.wrapping_sub(base_value) >= 2,
-            "job fence value wasn't incremented by at least 2"
+            "job fence value wasn't incremented by at least 2 (base={}, fence={})",
+            base_value, ctx.args.syncpt.value
         );
 
         main.drm
-            .wait_syncpoint(ctx.syncpt_id, ctx.args.syncpt.value, Duration::from_secs(1))?;
+            .wait_syncpoint(ctx.syncpt_id, ctx.args.syncpt.value, Duration::from_secs(1))
+            .context(format!(
+                "failed to wait for syncpoint {} to reach {} (base={})",
+                ctx.syncpt_id, ctx.args.syncpt.value, base_value
+            ))?;
 
         Ok(())
     })

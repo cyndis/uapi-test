@@ -28,7 +28,7 @@ use crate::{
     Main,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bytemuck::Zeroable;
 
 pub mod channels;
@@ -175,8 +175,10 @@ fn submit_test<T>(
     class: u32,
     f: impl FnOnce(SubmitTestCtx) -> Result<T>,
 ) -> Result<T> {
-    let channel = main.drm.open_channel(class)?;
-    let syncpt = main.drm.allocate_syncpoint()?;
+    let channel = main.drm.open_channel(class)
+        .context(format!("failed to open channel for class 0x{class:x}"))?;
+    let syncpt = main.drm.allocate_syncpoint()
+        .context("failed to allocate syncpoint")?;
     let syncpt_id = syncpt.id();
 
     let mut args: tegra_drm::drm_tegra_channel_submit = Zeroable::zeroed();
