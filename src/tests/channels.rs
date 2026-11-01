@@ -90,8 +90,8 @@ pub fn engine_metadata(main: &Main) -> Result<()> {
 
     check_eq!(
         channel.hw_version(),
-        main.soc.chip_id(),
-        "hw_version doesn't match chip id: {left}"
+        main.soc.engine_version(),
+        "hw_version doesn't match the engine version of this SoC: {left}"
     );
 
     Ok(())
