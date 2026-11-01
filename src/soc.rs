@@ -105,6 +105,16 @@ impl Soc {
         self.0
     }
 
+    /// The hardware version the kernel reports for this SoC's engines. Up to
+    /// Tegra234 that is the chip id; from Tegra264 it is the full one (0x264)
+    /// so that minor variants of a chip can be told apart.
+    pub fn engine_version(self) -> u32 {
+        match self.0 {
+            0x26 => 0x264,
+            id => id,
+        }
+    }
+
     pub fn default_engine(self) -> Engine {
         match self.0 {
             // Pre-Tegra124: GR2D

@@ -104,6 +104,19 @@ pub struct Main {
     engine_class: u32,
 }
 
+/// Returned by a test that cannot run on this system, for example because the
+/// engine it exercises is not present. Reported as SKIPPED rather than FAILED.
+#[derive(Debug)]
+pub struct Skip(pub String);
+
+impl std::fmt::Display for Skip {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Skip {}
+
 pub struct Test {
     pub name: &'static str,
     pub func: fn(&Main) -> anyhow::Result<()>,
@@ -284,6 +297,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut num_run = 0;
     let mut num_passed = 0;
     let mut num_staged_failed = 0;
+    let mut num_skipped = 0;
 
     let kmemleak = match kmemleak::Session::start() {
         Ok(session) => Some(session),
@@ -333,6 +347,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 num_passed += 1;
             }
+            Err(e) if e.downcast_ref::<Skip>().is_some() => {
+                println!(
+                    "{:<50} {} ({:.2}s)",
+                    test.name,
+                    out.yellow("SKIPPED"),
+                    elapsed.as_secs_f64()
+                );
+                println!("  {}", e);
+                num_skipped += 1;
+            }
             Err(e) => {
                 println!(
                     "{:<50} {} ({:.2}s)",
@@ -354,12 +378,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "{} tests total. {} run, {} skipped ({:.2}s)",
         num_total,
-        num_run,
-        num_total - num_run,
+        num_run - num_skipped,
+        num_total - num_run + num_skipped,
         total_elapsed.as_secs_f64()
     );
 
-    let num_failed = num_run - num_passed - num_staged_failed;
+    let num_failed = num_run - num_passed - num_staged_failed - num_skipped;
     let passed_str = format!("{} passed", num_passed);
     let failed_str = format!("{} failed", num_failed);
     let staged_str = format!("{} failed (staged)", num_staged_failed);

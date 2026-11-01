@@ -26,7 +26,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
-use crate::{tests::submit_test, Main};
+use crate::{tests::submit_test, Main, Skip, ENODEV};
 
 static SLICE_DATA: &[u8] = &[
     0x00, 0x00, 0x01, 0x01, 0x13, 0xf2, 0x14, 0xa5, 0x2f, 0x99, 0xbf, 0x70, 0x80,
@@ -96,6 +96,13 @@ fn read_u32_le(buf: &[u8], offset: usize) -> u32 {
 
 uapi_test!("engine.nvdec", nvdec_mpeg2, soc = [0x21, 0x18, 0x19, 0x23]);
 pub fn nvdec_mpeg2(main: &Main) -> Result<()> {
+    // A board can lack NVDEC even where the SoC has it: the upstream Jetson
+    // AGX Orin device trees leave it disabled. There is then no channel to
+    // open, which says nothing about the kernel under test.
+    if let Err(ENODEV) = main.drm.open_channel(0xf0) {
+        return Err(Skip("NVDEC is not available on this system".into()).into());
+    }
+
     let cfg_gem = main.drm.gem_create(0x1000)?;
     let mut cfg_map = cfg_gem.map(0x1000)?;
     fill_nvdec_mpeg2_config(&mut cfg_map);
